@@ -1,16 +1,16 @@
-#######################################################################
-### Gibbs Sampler for Bayesian Factor Analysis (Dirichlet Process) ####
-#######################################################################
+############################################################################
+### Gibbs Sampler for Infinite DP Mixtures of (Finite) Factor Analysers ####
+############################################################################
 
 # Gibbs Sampler Function
-  .gibbs_IMFA        <- function(Q, data, iters, N, P, G, mu.zero, rho, sigma.l, alpha.step, discount,
-                                 a.hyper, mu, sigma.mu, burnin, thinning, trunc.G, d.hyper, learn.d, uni.type,
-                                 ind.slice, psi.alpha, psi.beta, verbose, sw, cluster, DP.lab.sw, ...) {
+  .gibbs_IMFA        <- function(Q, data, iters, N, P, G, mu.zero, rho, sigma.l, learn.alpha, discount,  mu,
+                                 a.hyper, sigma.mu, burnin, thinning, d.hyper, learn.d, uni.type, uni.prior, trunc.G,
+                                 ind.slice, psi.alpha, psi.beta, verbose, sw, cluster, IM.lab.sw, zeta, kappa, ...) {
 
   # Define & initialise variables
     start.time       <- proc.time()
     total            <- max(iters)
-    if(verbose)         pb   <- utils::txtProgressBar(min=0, max=total, style=3)
+    if(verbose)         pb   <- txtProgressBar(min=0, max=total, style=3)
     n.store          <- length(iters)
     Gs               <- seq_len(G)
     Ts               <- seq_len(trunc.G)
@@ -19,68 +19,65 @@
     obsnames         <- rownames(data)
     varnames         <- colnames(data)
     colnames(data)   <- NULL
-    facnames         <- paste0("Factor ", seq_len(Q))
-    gnames           <- paste0("Group ", Ts)
-    iternames        <- paste0("Iteration", seq_len(n.store))
     Q0               <- Q  > 0
     Q0s              <- rep(Q0, trunc.G)
     Q1               <- Q == 1
     if(sw["mu.sw"])  {
-      mu.store       <- provideDimnames(array(0, dim=c(P, trunc.G, n.store)), base=list(varnames, gnames, iternames))
+      mu.store       <- array(0L,  dim=c(P, trunc.G, n.store))
     }
     if(sw["s.sw"])   {
-      eta.store      <- array(0, dim=c(N, Q, n.store))
-      dimnames(eta.store)    <- list(obsnames, if(Q0) facnames, iternames)
+      eta.store      <- array(0L,  dim=c(N, Q, n.store))
     }
     if(sw["l.sw"])   {
-      load.store     <- array(0, dim=c(P, Q, trunc.G, n.store))
-      dimnames(load.store)   <- list(varnames, if(Q0) facnames, gnames, iternames)
+      load.store     <- array(0L,  dim=c(P, Q, trunc.G, n.store))
     }
     if(sw["psi.sw"]) {
-      psi.store      <- provideDimnames(array(0, dim=c(P, trunc.G, n.store)), base=list(varnames, gnames, iternames))
+      psi.store      <- array(0L,  dim=c(P, trunc.G, n.store))
     }
     if(sw["pi.sw"])  {
-      pi.store       <- provideDimnames(matrix(0, nrow=trunc.G, ncol=n.store), base=list(gnames, iternames))
+      pi.store       <- matrix(0L, nrow=trunc.G, ncol=n.store)
     }
-    z.store          <- provideDimnames(matrix(0, nrow=N, ncol=n.store), base=list(obsnames, iternames))
-    ll.store         <- stats::setNames(rep(0, n.store), iternames)
+    z.store          <- matrix(0L, nrow=N, ncol=n.store)
+    ll.store         <- rep(0L, n.store)
     acc1             <- acc2 <- FALSE
     err.z            <- zerr <- FALSE
-    G.store          <- stats::setNames(rep(0, n.store), iternames)
-    not.fixed        <- alpha.step != "fixed"
-    if(not.fixed) {
-      alpha.store    <- stats::setNames(rep(0, n.store), iternames)
+    G.store          <- rep(0L, n.store)
+    act.store        <- G.store
+    if(learn.alpha) {
+      alpha.store    <- ll.store
       alpha.shape    <- a.hyper[1]
       alpha.rate     <- a.hyper[2]
     }
-    if(learn.d)   {
-      d.store        <- stats::setNames(rep(0, n.store), iternames)
+    if(learn.d)     {
+      d.store        <- ll.store
       d.shape1       <- d.hyper[1]
       d.shape2       <- d.hyper[2]
-    }
-    MH.step          <- alpha.step == "metropolis"
-    if(MH.step)   {
-      rate           <- stats::setNames(rep(0, n.store), iternames)
-    }
-    if(DP.lab.sw) {
-      lab.rate       <- matrix(0, nrow=2, ncol=n.store)
+      d.rates        <- rep(0L, total)
+      d.unif         <- d.shape1 == 1 & d.shape2 == 1
+    } else d.rates   <- 1
+    MH.step          <- any(discount  > 0, learn.d)
+    if(MH.step)     {
+      a.rates        <- rep(0L, total)
+    } else a.rates   <- 1
+    if(IM.lab.sw)   {
+      lab.rate       <- matrix(0L, nrow=2, ncol=total)
     }
     mu.sigma         <- 1/sigma.mu
     sig.mu.sqrt      <- sqrt(sigma.mu)
     z                <- cluster$z
     pi.alpha         <- cluster$pi.alpha
-    .sim_psi.inv     <- switch(uni.type, unconstrained=.sim_psi.iu,  isotropic=.sim_psi.ii)
-    .sim_psi.ip      <- switch(uni.type, unconstrained=.sim_psi.ipu, isotropic=.sim_psi.ipi)
-    psi.beta         <- unique(round(psi.beta, min(nchar(psi.beta))))
+    .sim_psi_inv     <- switch(uni.type,  unconstrained=.sim_psi_iu,  isotropic=.sim_psi_ii)
+    .sim_psi_ip      <- switch(uni.type,  unconstrained=.sim_psi_ipu, isotropic=.sim_psi_ipi)
+    psi.beta         <- switch(uni.prior, isotropic=unique(round(psi.beta, min(nchar(psi.beta)))), psi.beta)
     pi.prop          <- cluster$pi.prop
     nn               <- tabulate(z, nbins=trunc.G)
-    mu               <- cbind(mu, vapply(seq_len(trunc.G - G), function(g) .sim_mu.p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P)))
-    eta              <- .sim_eta.p(N=N, Q=Q)
-    lmat             <- lapply(Ts, function(t) .sim_load.p(Q=Q, P=P, sigma.l=sigma.l))
-    psi.inv          <- vapply(Ts, function(t) .sim_psi.ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), numeric(P))
+    mu               <- cbind(mu, vapply(seq_len(trunc.G - G), function(g) .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P)))
+    eta              <- .sim_eta_p(N=N, Q=Q)
+    lmat             <- lapply(Ts, function(t) .sim_load_p(Q=Q, P=P, sigma.l=sigma.l))
+    psi.inv          <- vapply(Ts, function(t) .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), numeric(P))
     if(Q0 && Q   < .ledermann(N, P)) {
       for(g in which(nn       > P))  {
-        fact         <- try(stats::factanal(data[z == g,, drop=FALSE], factors=Q, scores="regression", control=list(nstart=50)), silent=TRUE)
+        fact         <- try(factanal(data[z == g,, drop=FALSE], factors=Q, scores="regression", control=list(nstart=50)), silent=TRUE)
         if(!inherits(fact, "try-error")) {
           eta[z == g,]       <- fact$scores
           lmat[[g]]          <- fact$loadings
@@ -89,7 +86,7 @@
       }
     } else {
       psi.tmp        <- psi.inv
-      psi.inv[,Gs]   <- vapply(Gs, function(g) if(nn[g] > 1) 1/Rfast::colVars(data[z == g,, drop=FALSE]) else psi.tmp[,g], numeric(P))
+      psi.inv[,Gs]   <- vapply(Gs, function(g) if(nn[g] > 1) switch(uni.type, unconstrained=1/Rfast::colVars(data[z == g,, drop=FALSE]), rep(1/exp(mean(log(Rfast::colVars(data[z == g,, drop=FALSE])))), P)) else psi.tmp[,g], numeric(P))
       inf.ind        <- is.infinite(psi.inv)
       psi.inv[inf.ind]       <- psi.tmp[inf.ind]
     }
@@ -103,12 +100,14 @@
     nn               <- nn[index]
     nn0              <- nn > 0
     nn.ind           <- which(nn0)
-    G.non            <- sum(nn0)
+    G.non            <- length(nn.ind)
     z                <- factor(z, labels=match(nn.ind, index))
-    z                <- as.numeric(levels(z))[z]
-    ksi              <- (1 - rho) * rho^(Ts - 1)
-    log.ksi          <- log(ksi)
-    slice.logs       <- c(- Inf, 0)
+    z                <- as.integer(levels(z))[z]
+    if(ind.slice) {
+      ksi            <- (1 - rho) * rho^(Ts - 1)
+      log.ksi        <- log(ksi)
+    }
+    slice.logs       <- c(- Inf, 0L)
     if(burnin         < 1)  {
       mu.store[,,1]          <- mu
       eta.store[,,1]         <- eta
@@ -116,13 +115,15 @@
       psi.store[,,1]         <- 1/psi.inv
       pi.store[,1]           <- pi.prop
       z.store[,1]            <- z
-      ll.store[1]            <- .sim_z(data=data, mu=mu[,Gs], Gseq=Gs, N=N, pi.prop=pi.prop[Gs], sigma=lapply(Gs, function(g)
-                                corpcor::make.positive.definite(tcrossprod(lmat[,,g]) + diag(1/psi.inv[,g]))), Q0=Q0s[Gs])$log.like
+      sigma                  <- lapply(Gs, function(g) make.positive.definite(tcrossprod(lmat[,,g]) + diag(1/psi.inv[,g])))
+      log.probs              <- vapply(Gs, function(g, Q=Q0s[g]) dmvn(data, mu[,g], if(Q) sigma[[g]] else sqrt(sigma[[g]]), log=TRUE, isChol=!Q) + log(pi.prop[g]), numeric(N))
+      ll.store[1]            <- sum(gumbel_max(probs=log.probs, log.like=TRUE)$log.like)
       G.store[1]             <- G.non
-      if(not.fixed) {
+      act.store[1]           <- G
+      if(learn.alpha) {
         alpha.store[1]       <- pi.alpha
       }
-      if(learn.d)   {
+      if(learn.d)     {
         d.store[1]           <- discount
       }
     }
@@ -130,83 +131,136 @@
 
   # Iterate
     for(iter in seq_len(total)[-1]) {
-      if(verbose     && iter  < burnin) utils::setTxtProgressBar(pb, iter)
+      if(verbose     && iter  < burnin)  setTxtProgressBar(pb, iter)
+      storage        <- is.element(iter, iters)
 
     # Mixing Proportions
-      weights        <- .sim_pi.inf(pi.alpha=pi.alpha, nn=nn, N=N, len=trunc.G, lseq=Ts, discount=discount)
-      pi.prop        <- weights$pi.prop
-      Vs             <- weights$Vs
+      Vs             <- .sim_vs_inf(alpha=pi.alpha, nn=nn[Gs], N=N, discount=discount, len=G, lseq=Gs)
+      pi.prop        <- .sim_pi_inf(Vs, len=G)
 
     # Re-ordering & Slice Sampler
-      index          <- order(pi.prop, decreasing=TRUE)
-      pi.prop        <- pi.prop[index]
-      Vs             <- Vs[index]
-      mu             <- mu[,index, drop=FALSE]
-      lmat           <- lmat[,,index, drop=FALSE]
-      psi.inv        <- psi.inv[,index, drop=FALSE]
+      index          <- order(pi.prop[Gs], decreasing=TRUE)
+      prev.prod      <- pi.prop[G]  * (1/Vs[G] - 1)
+      pi.prop[Gs]    <- pi.prop[index]
+      Vs[Gs]         <- Vs[index]
+      mu[,Gs]        <- mu[,index, drop=FALSE]
+      lmat[,,Gs]     <- lmat[,,index, drop=FALSE]
+      psi.inv[,Gs]   <- psi.inv[,index, drop=FALSE]
       z              <- factor(z, labels=match(nn.ind, index))
-      z              <- as.numeric(levels(z))[z]
+      z              <- as.integer(levels(z))[z]
       if(!ind.slice) {
         ksi          <- pi.prop
         log.ksi      <- log(ksi)
       }
-      u.slice        <- stats::runif(N, 0, ksi[z])
-      G              <- max(vapply(Ns, function(i) sum(u.slice[i] < ksi), integer(1L)))
-      Gs             <- seq_len(G)
+      u.slice        <- runif(N, 0, ksi[z])
+      min.u          <- min(u.slice)
+      G.old          <- G
+      if(ind.slice)   {
+        G.new        <- sum(min.u   < ksi)
+        G.trunc      <- G.new < G.old
+        while(G  < G.new && (Vs[G] != 1 || pi.prop[G] != 0)) {
+          newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1, lseq=G + 1)
+          Vs         <- c(Vs,      newVs)
+          pi.prop    <- c(pi.prop, newVs * prev.prod)
+          G          <- G + 1
+          prev.prod  <- pi.prop[G]  * (1/Vs[G] - 1)
+        }
+        G            <- ifelse(!G.trunc, G, G.new)
+        Gs           <- seq_len(G)
+        if(G.trunc)   {
+          pi.prop    <- pi.prop[Gs]
+          Vs         <- Vs[Gs]
+        }
+      } else     {
+        cum.pi       <- sum(pi.prop)
+        u.max        <- 1 - min.u
+        G.trunc      <- cum.pi > u.max
+        while(cum.pi  < u.max && trunc.G > G && (pi.prop[G] != 0 || Vs[G] != 1)) {
+          newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1, lseq=G + 1)
+          Vs         <- c(Vs,      newVs)
+          newPis     <- newVs  *   prev.prod
+          pi.prop    <- c(pi.prop, newPis)
+          cum.pi     <- cum.pi +   newPis
+          ksi        <- pi.prop
+          log.ksi    <- c(log.ksi, log(newPis))
+          G          <- G + 1
+          prev.prod  <- pi.prop[G] * (1/Vs[G] - 1)
+        }
+        G            <- ifelse(G.trunc, which.max(cumsum(pi.prop) > u.max), G)
+        Gs           <- seq_len(G)
+        if(G.trunc) {
+          pi.prop    <- ksi   <-   pi.prop[Gs]
+          log.ksi    <- log.ksi[Gs]
+          Vs         <- Vs[Gs]
+        }
+      }
       log.slice.ind  <- vapply(Gs, function(g) slice.logs[1 + (u.slice < ksi[g])] - log.ksi[g], numeric(N))
 
     # Cluster Labels
       psi            <- 1/psi.inv
-      sigma          <- lapply(Gs, function(g) tcrossprod(lmat[,,g]) + diag(psi[,g]))
-      z.log          <- utils::capture.output({ z.res <- try(.sim_z.inf(data=data, mu=mu[,Gs, drop=FALSE], sigma=sigma, Gseq=Gs, N=N, pi.prop=pi.prop[Gs], log.slice.ind=log.slice.ind, Q0=Q0s[Gs]), silent=TRUE) })
-      zerr           <- inherits(z.res, "try-error")
-      if(zerr) {
-        sigma        <- lapply(sigma, corpcor::make.positive.definite)
-        z.res        <- .sim_z.inf(data=data, mu=mu[,Gs, drop=FALSE], sigma=sigma, Gseq=Gs, N=N, pi.prop=pi.prop[Gs], log.slice.ind=log.slice.ind, Q0=Q0s[Gs])
+      if(G > 1)  {
+        sigma        <- lapply(Gs, function(g) tcrossprod(lmat[,,g]) + diag(psi[,g]))
+        log.pis      <- if(ind.slice)  log(pi.prop)  else log.ksi
+        log.check    <- capture.output(log.probs  <- try(vapply(Gs, function(g, Q=Q0s[g]) dmvn(data, mu[,g], if(Q) sigma[[g]] else sqrt(sigma[[g]]), log=TRUE, isChol=!Q) + log.pis[g], numeric(N)), silent=TRUE))
+        if(inherits(log.probs, "try-error")) {
+          log.probs  <- vapply(Gs, function(g, Q=Q0s[g]) dmvn(data, mu[,g], if(Q) make.positive.definite(sigma[[g]]) else make.positive.definite(sqrt(sigma[[g]])), log=TRUE, isChol=!Q) + log.pis[g], numeric(N))
+        }
+        z.res        <- gumbel_max(probs=log.probs + log.slice.ind, log.like=TRUE, slice=TRUE)
+        z            <- z.res$z
+      } else     {
+        z            <- rep(1L, N)
       }
-      z              <- z.res$z
       nn             <- tabulate(z, nbins=trunc.G)
       nn0            <- nn > 0
       nn.ind         <- which(nn0)
+      G.non          <- length(nn.ind)
       dat.g          <- lapply(Gs, function(g) data[z == g,, drop=FALSE])
 
     # Scores & Loadings
       c.data         <- lapply(Gs, function(g) sweep(dat.g[[g]], 2, mu[,g], FUN="-"))
-      if(Q0)   {
+      if(Q0)     {
         eta.tmp      <- lapply(Gs, function(g) if(nn0[g]) .sim_score(N=nn[g], lmat=lmat[,,g], Q=Q, c.data=c.data[[g]], psi.inv=psi.inv[,g], Q1=Q1) else base::matrix(0, nrow=0, ncol=Q))
         EtE          <- lapply(Gs, function(g) if(nn0[g]) crossprod(eta.tmp[[g]]))
         lmat[,,Gs]   <- array(unlist(lapply(Gs, function(g) if(nn0[g]) matrix(unlist(lapply(Ps, function(j) .sim_load(l.sigma=l.sigma, Q=Q, c.data=c.data[[g]][,j], eta=eta.tmp[[g]],
-                        EtE=EtE[[g]], Q1=Q1, psi.inv=psi.inv[,g][j])), use.names=FALSE), nrow=P, byrow=TRUE) else .sim_load.p(Q=Q, P=P, sigma.l=sigma.l)), use.names=FALSE), dim=c(P, Q, G))
+                        EtE=EtE[[g]], Q1=Q1, psi.inv=psi.inv[,g][j])), use.names=FALSE), nrow=P, byrow=TRUE) else .sim_load_p(Q=Q, P=P, sigma.l=sigma.l)), use.names=FALSE), dim=c(P, Q, G))
         eta          <- do.call(rbind, eta.tmp)[obsnames,, drop=FALSE]
       } else   {
         eta.tmp      <- lapply(Gs, function(g) eta[z == g,, drop=FALSE])
       }
 
+    # Uniquenesses
+      psi.inv[,Gs]   <- vapply(Gs, function(g) if(nn0[g]) .sim_psi_inv(N=nn[g], psi.alpha=psi.alpha, c.data=c.data[[g]], P=P, eta=eta.tmp[[g]], psi.beta=psi.beta,
+                               lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g]) else .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), numeric(P))
+
     # Means
       sum.data       <- vapply(dat.g, colSums, numeric(P))
       sum.eta        <- lapply(eta.tmp, colSums)
       mu[,Gs]        <- vapply(Gs, function(g) if(nn0[g]) .sim_mu(mu.sigma=mu.sigma, psi.inv=psi.inv[,g], mu.zero=mu.zero, sum.data=sum.data[,g], sum.eta=sum.eta[[g]],
-                               lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu.p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
-
-    # Uniquenesses
-      psi.inv[,Gs]   <- vapply(Gs, function(g) if(nn0[g]) .sim_psi.inv(N=nn[g], psi.alpha=psi.alpha, c.data=c.data[[g]], P=P, eta=eta.tmp[[g]], psi.beta=psi.beta,
-                               lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g]) else .sim_psi.ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), numeric(P))
+                               lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
 
     # Alpha
-      if(not.fixed) {
-        if(MH.step) {
-          MH.alpha   <- .sim_alpha.m(alpha=pi.alpha, lower=alpha.shape, upper=alpha.rate, trunc.G=trunc.G, Vs=Vs, discount=discount)
+      if(learn.alpha)      {
+        if(discount  != 0) {
+          MH.alpha   <- .sim_alpha_m(alpha=pi.alpha, discount=discount, alpha.shape=alpha.shape, alpha.rate=alpha.rate, N=N, G=G.non, zeta=zeta)
           pi.alpha   <- MH.alpha$alpha
+          a.rate     <- MH.alpha$rate
         } else {
-          pi.alpha   <- .sim_alpha.g(alpha=pi.alpha, shape=alpha.shape, rate=alpha.rate, G=G, N=N, discount=discount)
+          pi.alpha   <- .sim_alpha_g(alpha=pi.alpha, shape=alpha.shape, rate=alpha.rate, G=G.non, N=N)
+          a.rate     <- 1
         }
       }
 
+    # Discount
+      if(learn.d) {
+        MH.disc      <- .sim_disc_mh(discount=discount, alpha=pi.alpha, disc.shape1=d.shape1, disc.shape2=d.shape2, N=N, G=G.non, kappa=kappa, unif=d.unif, nn=nn[nn0])
+        discount     <- MH.disc$disc
+        d.rate       <- MH.disc$rate
+      }
+
     # Label Switching
-      G.non          <- sum(nn0)
-      if(DP.lab.sw)   {
+      if(IM.lab.sw)   {
         if(G.non > 1) {
-          move1      <- .lab.move1(nn.ind=nn.ind, pi.prop=pi.prop, nn=nn)
+          move1      <- .lab_move1(nn.ind=nn.ind, pi.prop=pi.prop, nn=nn)
           acc1       <- move1$rate1
           if(acc1)    {
             sw1      <- move1$sw
@@ -222,10 +276,10 @@
             zsw1     <- z == sw1[1]
             z[z == sw1[2]]   <- sw1[1]
             z[zsw1]  <- sw1[2]
-          } else        acc1 <- FALSE
-        }
+          }
+        } else  acc1 <- FALSE
         if(G     > 1) {
-          move2      <- .lab.move2(Gs=Gs, G=G, Vs=Vs, nn=nn)
+          move2      <- .lab_move2(G=G, Vs=Vs, nn=nn)
           acc2       <- move2$rate2
           if(acc2)    {
             sw2      <- move2$sw
@@ -240,44 +294,51 @@
             zsw2     <- z == sw2[1]
             z[z == sw2[2]]   <- sw2[1]
             z[zsw2]  <- sw2[2]
-          } else        acc2 <- FALSE
-        }
+          }
+        } else  acc2 <- FALSE
       }
-      if(zerr && !err.z) {      warning("Algorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices", call.=FALSE)
+      if(zerr && !err.z) {                                       warning("Algorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices", call.=FALSE)
         err.z        <- TRUE
       }
-
-      if(is.element(iter, iters)) {
-        if(verbose)     utils::setTxtProgressBar(pb, iter)
+      if(MH.step)       a.rates[iter]                         <- a.rate
+      if(learn.d)       d.rates[iter]                         <- d.rate
+      if(IM.lab.sw)     lab.rate[,iter]                       <- c(acc1, acc2)
+      if(storage)    {
+        if(verbose)     setTxtProgressBar(pb, iter)
         new.it       <- which(iters == iter)
-        if(sw["mu.sw"])               mu.store[,,new.it]     <- mu
-        if(all(sw["s.sw"], Q0))       eta.store[,,new.it]    <- eta
-        if(all(sw["l.sw"], Q0))       load.store[,,,new.it]  <- lmat
-        if(sw["psi.sw"])              psi.store[,,new.it]    <- psi
-        if(sw["pi.sw"])               pi.store[,new.it]      <- pi.prop
-        if(not.fixed)                 alpha.store[new.it]    <- pi.alpha
-        if(learn.d)                   d.store[new.it]        <- discount
-        if(MH.step)                   rate[new.it]           <- MH.alpha$rate
-        if(DP.lab.sw)                 lab.rate[,new.it]      <- c(acc1, acc2)
-                                      z.store[,new.it]       <- z
-                                      ll.store[new.it]       <- z.res$log.like
-                                      G.store[new.it]        <- G.non
+        if(sw["mu.sw"])               mu.store[,,new.it]      <- mu
+        if(all(sw["s.sw"], Q0))       eta.store[,,new.it]     <- eta
+        if(all(sw["l.sw"], Q0))       load.store[,,,new.it]   <- lmat
+        if(sw["psi.sw"])              psi.store[,,new.it]     <- 1/psi.inv
+        if(sw["pi.sw"])               pi.store[Gs,new.it]     <- pi.prop
+        if(learn.alpha)               alpha.store[new.it]     <- pi.alpha
+        if(learn.d)                   d.store[new.it]         <- discount
+                                      z.store[,new.it]        <- as.integer(z)
+                                      ll.store[new.it]        <- if(G > 1) sum(z.res$log.like) else sum(dmvn(X=data, mu=mu[,nn.ind], sigma=tcrossprod(as.matrix(lmat[,,nn.ind])) + diag(psi.store[,nn.ind,new.it]), log=TRUE))
+                                      G.store[new.it]         <- as.integer(G.non)
+                                      act.store[new.it]       <- as.integer(G)
       }
     }
-    close(pb)
-    Gmax             <- seq_len(max(as.numeric(z.store)))
-    returns          <- list(mu       = if(sw["mu.sw"])         mu.store[,Gmax,, drop=FALSE],
-                             eta      = if(all(sw["s.sw"], Q0)) eta.store,
-                             load     = if(all(sw["l.sw"], Q0)) load.store[,,Gmax,, drop=FALSE],
-                             psi      = if(sw["psi.sw"])        psi.store[,Gmax,, drop=FALSE],
-                             pi.prop  = if(sw["pi.sw"])         pi.store[Gmax,, drop=FALSE],
-                             alpha    = if(not.fixed)           alpha.store,
-                             discount = if(learn.d)             d.store,
-                             rate     = if(MH.step)             mean(rate),
-                             lab.rate = if(DP.lab.sw)           stats::setNames(Rfast::rowmeans(lab.rate), c("Move1", "Move2")),
-                             z.store  = z.store,
-                             ll.store = ll.store,
-                             G.store  = G.store,
-                             time     = init.time)
+    if(verbose)         close(pb)
+    Gmax             <- seq_len(max(as.integer(z.store)))
+    mu.store         <- if(sw["mu.sw"])  tryCatch(mu.store[,Gmax,, drop=FALSE],    error=function(e) mu.store)
+    load.store       <- if(sw["l.sw"])   tryCatch(load.store[,,Gmax,, drop=FALSE], error=function(e) load.store)
+    psi.store        <- if(sw["psi.sw"]) tryCatch(psi.store[,Gmax,, drop=FALSE],   error=function(e) psi.store)
+    pi.store         <- if(sw["pi.sw"])  tryCatch(pi.store[Gmax,, drop=FALSE],     error=function(e) pi.store)
+    returns          <- list(mu        = if(sw["mu.sw"])         tryCatch(provideDimnames(mu.store,   base=list(varnames, "", ""),     unique=FALSE), error=function(e) mu.store),
+                             eta       = if(all(sw["s.sw"], Q0)) tryCatch(provideDimnames(eta.store,  base=list(obsnames, "", ""),     unique=FALSE), error=function(e) eta.store),
+                             load      = if(all(sw["l.sw"], Q0)) tryCatch(provideDimnames(load.store, base=list(varnames, "", "", ""), unique=FALSE), error=function(e) load.store),
+                             psi       = if(sw["psi.sw"])        tryCatch(provideDimnames(psi.store,  base=list(varnames, "", ""),     unique=FALSE), error=function(e) psi.store),
+                             pi.prop   = if(sw["pi.sw"])         pi.store,
+                             alpha     = if(learn.alpha)         alpha.store,
+                             discount  = if(learn.d) {           if(sum(d.store == 0)/n.store > 0.5) as.simple_triplet_matrix(d.store) else d.store },
+                             a.rate    = if(MH.step)             mean(a.rates) else a.rates,
+                             d.rate    = if(learn.d)             mean(d.rates) else d.rates,
+                             lab.rate  = if(IM.lab.sw)           setNames(rowmeans(lab.rate), c("Move1", "Move2")),
+                             z.store   = z.store,
+                             ll.store  = ll.store,
+                             G.store   = G.store,
+                             act.store = act.store,
+                             time      = init.time)
     return(returns)
   }

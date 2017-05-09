@@ -4,16 +4,19 @@
 \alias{mat2cols}
 \title{Convert a numeric matrix to colours}
 \usage{
-mat2cols(mat, cols = NULL, byrank = FALSE, breaks = length(cols))
+mat2cols(mat, cols = NULL, byrank = FALSE, breaks = length(cols),
+  na.color = "#808080FF")
 }
 \arguments{
 \item{mat}{A matrix.}
 
 \item{cols}{The colour palette to be used. The default palette uses \code{\link[viridis]{viridis}}. Will be checked for validity.}
 
-\item{byrank}{Logical indicating whether to convert the matrix itself or the sample ranks of the values therein. Defaults to FALSE.}
+\item{byrank}{Logical indicating whether to convert the matrix itself or the sample ranks of the values therein. Defaults to \code{FALSE}.}
 
 \item{breaks}{Number of gradations in colour to use. Defaults to \code{length(cols)}.}
+
+\item{na.color}{Colour to be used to represent missing data.}
 }
 \value{
 A matrix of hex colour code representations.
@@ -22,14 +25,19 @@ A matrix of hex colour code representations.
 Converts a matrix to a hex colour code representation for plotting using \code{\link[gclus]{plotcolors}}. Used internally by \code{\link{plot.Results_IMIFA}} for plotting posterior mean loadings heatmaps.
 }
 \examples{
-mat  <- matrix(rnorm(100), nrow=10, ncol=10)
-cols <- mat2cols(mat)
-cols
+mat      <- matrix(rnorm(100), nrow=10, ncol=10)
+mat[2,3] <- NA
+cols     <- heat.colors(12)[12:1]
+matcol   <- mat2cols(mat, cols=cols)
+matcol
 
-# Use gclus::plotcolors() to visualise the colours matrix
-# plotcolors(cols)
+# Use plotcolors() to visualise the colours matrix
+par(mar=c(5.1, 4.1, 4.1, 4.1))
+gclus::plotcolors(matcol)
+
+# Add a legend
+heat_legend(mat, cols=cols); box(lwd=2)
 }
 \seealso{
 \code{\link[gclus]{plotcolors}}
 }
-

@@ -26,19 +26,20 @@ sim_IMIFA_data(N = 300L, G = 3L, P = 50L, Q = rep(4L, G),
 \item{method}{A switch indicating whether the mixture to be simulated from is the conditional distribution of the data given the latent variables (default), or simply the marginal distribution of the data.}
 }
 \value{
-A data.frame with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored.
+Invisibly returns a data.frame with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored.
 }
 \description{
 Function to simulate data of any size and dimension from a mixture of (infinite) factor analysers structure.
 }
 \examples{
 # Simulate 100 observations from 3 balanced groups with cluster-specific numbers of latent factors
-# sim.data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5))
-# names(attributes(sim.data))
-# attr(sim.data, "Labels")
-# tmp      <- mcmc_IMIFA(sim.data, method="MIFA", range.G=3, n.iters=5000)
+# sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5))
+# names(attributes(sim_data))
+# attr(sim_data, "Labels")
+
+# Fit a MIFA model to this data
+# tmp      <- mcmc_IMIFA(sim_data, method="MIFA", range.G=3, n.iters=5000)
 }
 \seealso{
 The function \code{\link{mcmc_IMIFA}} for fitting an IMIFA related model to the simulated data set.
 }
-
