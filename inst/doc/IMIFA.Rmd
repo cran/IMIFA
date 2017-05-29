@@ -190,10 +190,10 @@ We could instead plot all observations simultaneously for a given factor, say th
 plot(resIMIFA, plot.meth="trace", param="scores", mat=TRUE, by.fac=TRUE, fac=2)
 ```
 
-The code below will produce only a heatmap of the loadings matrix in the first cluster. Darker colours correspond to entries which are more negatively loaded and _vice versa_.
+The code below will produce only a heatmap of the loadings matrix in the first cluster: note, however, that `heat.map=TRUE` by default for loadings (whereas the opposite is true for the scores). Darker colours correspond to entries which are more negatively loaded and _vice versa_.
 
 ```{r}
-plot(resIMIFA, plot.meth="means", param="loadings", load.meth="heatmap", g=1)
+plot(resIMIFA, plot.meth="means", param="loadings", heat.map=TRUE, g=1)
 ```
 To examine uniquenesses from all clusters in the form of a parellel coordinates plot, type
 
@@ -217,6 +217,6 @@ plot(resIMIFA, plot.meth="all", param="discount")
 # References
 For a more detailed description of the kind of things IMIFA can do and the purposes for which the model was developed, please consult the followng papers:
 
-Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, [_to appear_](https://arxiv.org/abs/1701.07010).
+Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, _to appear_, [arXiv:1701.07010](https://arxiv.org/abs/1701.07010).
 
 Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian infinite factor models. _Biometrika_, 98(2): 291-306.

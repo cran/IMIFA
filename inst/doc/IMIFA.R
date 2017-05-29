@@ -83,7 +83,7 @@ plot(resIMIFA, plot.meth="means", param="means", mat=TRUE, g=1)
 #  plot(resIMIFA, plot.meth="trace", param="scores", mat=TRUE, by.fac=TRUE, fac=2)
 
 ## ------------------------------------------------------------------------
-plot(resIMIFA, plot.meth="means", param="loadings", load.meth="heatmap", g=1)
+plot(resIMIFA, plot.meth="means", param="loadings", heat.map=TRUE, g=1)
 
 ## ------------------------------------------------------------------------
 plot(resIMIFA, plot.meth="parallel.coords", param="uniquenesses")

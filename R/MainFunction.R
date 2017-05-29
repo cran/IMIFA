@@ -51,7 +51,7 @@
 #' @param ind.slice Logical indicitating whether the independent slice-efficient sampler is to be employed. If \code{FALSE} the dependent slice-efficient sampler is employed, whereby the slice sequence xi_1,...,xi_g is equal to the decreasingly ordered mixing proportions. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods. Defaults to \code{TRUE}.
 #' @param rho Parameter controlling the rate of geometric decay for the independent slice-efficient sampler, s.t. xi = (1 - rho)rho^(g-1). Must lie in the interval (0, 1]. Higher values are associated with better mixing but longer run times. Defaults to 0.75, but 0.5 is an interesting special case which guarantees that the slice sequence xi_1,...,xi_g is equal to the \emph{expectation} of the decreasingly ordered mixing proportions. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods when \code{ind.slice} is \code{TRUE}.
 #' @param IM.lab.sw Logial indicating whether the two forced label switching moves are to be implemented (defaults to \code{TRUE}) when running one of the infinite mixture models, with Dirichlet process or Pitman-Yor process priors. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods.
-#' @param verbose Logical indicating whether to print output (e.g. run times) and a progress bar to the screen while the sampler runs (defaults to \code{TRUE}). If \code{FALSE}, warnings and error messages will still be printed to the screen, but everything else will be suppressed.
+#' @param verbose Logical indicating whether to print output (e.g. run times) and a progress bar to the screen while the sampler runs. By default is \code{TRUE} if the session is interactive, and \code{FALSE} otherwise. If \code{FALSE}, warnings and error messages will still be printed to the screen, but everything else will be suppressed.
 #' @param discount The discount parameter used when generalising the Dirichlet process to the Pitman-Yor process. Must lie in the interval [0, 1). If non-zero, \code{alpha} can be supplied greater than -discount. Defaults to 0. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods.
 #' @param learn.d Logical indicating whether the \code{discount} parameter is to be updated via Metropolis-Hastings. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods, in which case the default is \code{FALSE}.
 #' @param d.hyper Hyperparameters for the Beta(a,b) prior on the \code{discount} hyperparameter. Only relevant for the "\code{IMFA}" and "\code{IMIFA}" methods.
@@ -74,13 +74,12 @@
 #' @importFrom e1071 "matchClasses"
 #' @importFrom mvnfast "dmvn"
 #' @importFrom slam "as.simple_sparse_array" "as.simple_triplet_matrix"
-#' @importFrom corpcor "make.positive.definite"
 #' @importFrom mclust "Mclust" "mclustBIC"
 #' @importFrom utils "memory.limit"
 #'
 #' @seealso \code{\link{get_IMIFA_results}}, \code{\link{psi_hyper}}, \code{\link{MGP_check}}
 #' @references
-#' Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \code{https://arxiv.org/abs/1701.07010}
+#' Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \href{https://arxiv.org/abs/1701.07010}{arXiv:1701.07010}.
 #'
 #' Bhattacharya, A. and Dunson, D. B. (2011) Sparse Bayesian infinite factor models, \emph{Biometrika}, 98(2): 291-306.
 #'
@@ -89,6 +88,8 @@
 #' Rousseau, J. and Mengersen, K. (2011) Asymptotic Behaviour of the posterior distribution in overfitted mixture models, \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}, 73(5): 689-710.
 #'
 #' Tipping, M. E. and Bishop, C. M. (1999). Probabilistic principal component analysis, \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}, 61(3): 611-622.
+#'
+#' @author Keefe Murphy
 #'
 #' @examples
 #' # data(olive)
@@ -126,7 +127,7 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
                         thinning = 2L, centering = TRUE, scaling = c("unit", "pareto", "none"), mu.zero = NULL, sigma.mu = NULL, sigma.l = NULL, alpha = NULL, psi.alpha = NULL, psi.beta = NULL,
                         uni.type = c("unconstrained", "isotropic"), uni.prior = c("unconstrained", "isotropic"), z.init = c("mclust", "kmeans", "list", "priors"), z.list = NULL, adapt = TRUE,
                         prop = NULL, epsilon = NULL, alpha.d1 = NULL, alpha.d2 = NULL, beta.d1 = NULL, beta.d2 = NULL, nu = NULL, nuplus1 = TRUE, adapt.at = NULL, b0 = NULL, b1 = NULL,
-                        trunc.G = NULL, learn.alpha = TRUE, alpha.hyper = NULL, zeta = NULL, ind.slice = TRUE, rho = NULL, IM.lab.sw = TRUE, verbose = TRUE, discount = NULL, learn.d = FALSE,
+                        trunc.G = NULL, learn.alpha = TRUE, alpha.hyper = NULL, zeta = NULL, ind.slice = TRUE, rho = NULL, IM.lab.sw = TRUE, verbose = interactive(), discount = NULL, learn.d = FALSE,
                         d.hyper = NULL, kappa = NULL, mu0g = FALSE, psi0g = FALSE, delta0g = FALSE, mu.switch = TRUE, score.switch = TRUE, load.switch = TRUE, psi.switch = TRUE, pi.switch = TRUE) {
 
   call      <- match.call()
@@ -219,7 +220,7 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
          uni.type  == "isotropic")) stop("'uni.prior' can only be 'unconstrained' when 'uni.type' is 'unconstrained'")
   if(all(uni.prior == "unconstrained",
          uni.type  == "unconstrained",
-         NlP, miss.uni))            message("Consider setting 'uni.type', or at least 'uni.prior', to 'isotropic' in N << P cases")
+         NlP, miss.uni, verbose))   message("Consider setting 'uni.type', or at least 'uni.prior', to 'isotropic' in N << P cases")
 
 # Manage storage switches & warnings for other function inputs
   if(!missing(mu.switch)  && all(!mu.switch, ifelse(method == "classify",
@@ -259,11 +260,11 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
   if(!is.element(method, c("IMFA", "IMIFA"))) {
     if(learn.alpha) {
       learn.alpha  <- FALSE
-      if(!alpha.x)                  message(paste0("'learn.alpha' forced to FALSE for the ", method, " method"))
+      if(verbose   && !alpha.x)     message(paste0("'learn.alpha' forced to FALSE for the ", method, " method"))
     }
     if(learn.d)     {
       learn.d      <- FALSE
-      if(!disc.x)                   message(paste0("'learn.d' must be FALSE for the ", method, " method"))
+      if(verbose   && !disc.x)      message(paste0("'learn.d' must be FALSE for the ", method, " method"))
     }
   }
   if(!is.element(method, c("MFA", "MIFA")))      {
@@ -275,7 +276,8 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
       tmp.G        <- as.integer(min(N - 1, max(25, ceiling(3 * lnN))))
       if(G.x)   {
         range.G    <- G.init <- tmp.G
-        if(NlP) {                   message(paste0("Since N < P, the sampler will be initialised with a different default of ceiling(log(N)) = ", lnN2, " groups (unless 'range.G' is supplied)"))
+        if(NlP) {
+          if(verbose)               message(paste0("Since N < P, the sampler will be initialised with a different default of ceiling(log(N)) = ", lnN2, " groups (unless 'range.G' is supplied)"))
           G.init   <- max(2, lnN2)
         }
       }
@@ -569,7 +571,8 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
   if(!is.element(method, c("FA", "MFA", "OMFA", "IMFA"))) {
     alpha.d1       <- if(ad1.x) list(3L) else .len_check(alpha.d1, delta0g, method, P, G.init, P.dim=FALSE)
     alpha.d2       <- if(ad2.x) list(6L) else .len_check(alpha.d2, delta0g, method, P, G.init, P.dim=FALSE)
-    if(all(NlP, any(ad1.x, ad2.x))) message("Consider applying more shrinkage with higher 'alpha.d1' and 'alpha.d2' hyperparameter values when N << P")
+    if(all(NlP, verbose,
+           any(ad1.x, ad2.x)))      message("Consider applying more shrinkage with higher 'alpha.d1' and 'alpha.d2' hyperparameter values when N << P")
   }
   if(!is.element(method, c("FA", "IFA"))) {
     if(verbose)                     cat(paste0("Initialising...\n"))
@@ -587,7 +590,7 @@ mcmc_IMIFA  <- function(dat = NULL, method = c("IMIFA", "IMFA", "OMIFA", "OMFA",
       } else if(z.init  == "list")   {
         zi[[g]]    <- as.integer(z.list[[g]])
       } else if(z.init  == "mclust") {
-        m.res      <- try(Mclust(dat, G), silent=TRUE)
+        m.res      <- try(Mclust(dat, G, verbose=FALSE), silent=TRUE)
         if(!inherits(m.res, "try_error"))  {
           zi[[g]]  <- as.integer(factor(m.res$classification, levels=seq_len(G)))
         } else                      stop("Cannot initialise cluster labels using mclust. Try another z.init method")

@@ -4,40 +4,61 @@
 \alias{mat2cols}
 \title{Convert a numeric matrix to colours}
 \usage{
-mat2cols(mat, cols = NULL, byrank = FALSE, breaks = length(cols),
-  na.color = "#808080FF")
+mat2cols(mat, cols = NULL, compare = FALSE, byrank = FALSE,
+  breaks = length(cols), na.col = "#808080FF")
 }
 \arguments{
-\item{mat}{A matrix.}
+\item{mat}{Either a matrix or, when \code{compare} is \code{TRUE}, a list of matrices.}
 
 \item{cols}{The colour palette to be used. The default palette uses \code{\link[viridis]{viridis}}. Will be checked for validity.}
+
+\item{compare}{Logical switch used when desiring comparable colour representations (usually for comparable heat maps) across multiple matrices. Ensures plots will be calibrated to a common colour scale so that, for instance, the colour on the heat map of an entry valued at 0.7 in Matrix A corresponds exactly to the colour of a similar value in Matrix B. When \code{TRUE}, \code{mat} must be supplied as a list of matrices, which must have either the same number of rows, or the same number of columns.}
 
 \item{byrank}{Logical indicating whether to convert the matrix itself or the sample ranks of the values therein. Defaults to \code{FALSE}.}
 
 \item{breaks}{Number of gradations in colour to use. Defaults to \code{length(cols)}.}
 
-\item{na.color}{Colour to be used to represent missing data.}
+\item{na.col}{Colour to be used to represent missing data.}
 }
 \value{
-A matrix of hex colour code representations.
+A matrix of hex colour code representations, or a list of such matrices when \code{compare} is \code{TRUE}.
 }
 \description{
-Converts a matrix to a hex colour code representation for plotting using \code{\link[gclus]{plotcolors}}. Used internally by \code{\link{plot.Results_IMIFA}} for plotting posterior mean loadings heatmaps.
+Converts a matrix to a hex colour code representation for plotting using \code{\link{plot_cols}}. Used internally by \code{\link{plot.Results_IMIFA}} for plotting posterior mean loadings heatmaps.
 }
 \examples{
+# Generate a colour matrix using mat2cols()
 mat      <- matrix(rnorm(100), nrow=10, ncol=10)
 mat[2,3] <- NA
 cols     <- heat.colors(12)[12:1]
 matcol   <- mat2cols(mat, cols=cols)
 matcol
 
-# Use plotcolors() to visualise the colours matrix
+# Use plot_cols() to visualise the colours matrix
 par(mar=c(5.1, 4.1, 4.1, 4.1))
-gclus::plotcolors(matcol)
+plot_cols(matcol)
 
-# Add a legend
+# Add a legend using heat_legend()
 heat_legend(mat, cols=cols); box(lwd=2)
+
+# Try comparing heat maps of multiple matrices
+mat1     <- matrix(rnorm(100), nr=50, nc=2)
+mat2     <- matrix(rnorm(150), nr=50, nc=3)
+mat3     <- matrix(rnorm(50),  nr=50, nc=1)
+mats     <- list(mat1, mat2, mat3)
+colmats  <- mat2cols(mats, cols=cols, compare=TRUE)
+par(mfrow=c(2, 3), mar=c(1, 2, 1, 2))
+
+# Use common palettes (top row)
+plot_cols(colmats[[1]]); heat_legend(range(mats), cols=cols); box(lwd=2)
+plot_cols(colmats[[2]]); heat_legend(range(mats), cols=cols); box(lwd=2)
+plot_cols(colmats[[3]]); heat_legend(range(mats), cols=cols); box(lwd=2)
+
+# Use uncommon palettes (bottom row)
+plot_cols(mat2cols(mat1, cols=cols)); heat_legend(range(mats), cols=cols); box(lwd=2)
+plot_cols(mat2cols(mat2, cols=cols)); heat_legend(range(mats), cols=cols); box(lwd=2)
+plot_cols(mat2cols(mat3, cols=cols)); heat_legend(range(mats), cols=cols); box(lwd=2)
 }
 \seealso{
-\code{\link[gclus]{plotcolors}}
+\code{\link{plot_cols}}, \code{\link{heat_legend}}
 }

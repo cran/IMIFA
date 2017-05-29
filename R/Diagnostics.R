@@ -27,13 +27,14 @@
 #' @export
 #' @importFrom Rfast "med" "rowMaxs" "standardise" "colMaxs" "rowVars" "rowmeans" "Order" "cova" "Var"
 #' @importFrom abind "adrop"
-#' @importFrom MCMCpack "procrustes"
 #' @importFrom e1071 "matchClasses" "classAgreement"
 #' @importFrom mclust "classError"
 #' @importFrom matrixStats "rowMedians" "rowQuantiles"
 #'
 #' @seealso \code{\link{mcmc_IMIFA}}, \code{\link{plot.Results_IMIFA}}, \code{\link{Zsimilarity}}
-#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \code{https://arxiv.org/abs/1701.07010}
+#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \href{https://arxiv.org/abs/1701.07010}{arXiv:1701.07010}.
+#'
+#' @author Keefe Murphy
 #'
 #' @examples
 #' # data(coffee)
@@ -262,9 +263,9 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       tmp.store  <- tmp.store[[Q.ind]]
     }
     if(!inf.Q)   {
-      Q          <- if(length(n.fac)   > 1)  Q else  n.fac
+      Q          <- if(length(n.fac)   > 1)  Q             else  n.fac
       Q.ind      <- if(all(!Q.T, length(n.fac) > 1)) Q.ind else which(n.fac == Q)
-      Q          <- setNames(if(length(Q) != G) rep(Q, G) else Q, gnames)
+      Q          <- setNames(if(length(Q) != G) rep(Q, G)  else Q, gnames)
       if(all(inf.G, Q.T))  GQ.temp1$G <- rep(G, GQs)
       if(is.element(method, c("OMFA", "IMFA")) && GQ1) {
         GQ.temp1$G.CI     <- lapply(seq_len(GQs), function(gq) GQ.temp1$G.CI[gq,])
@@ -621,7 +622,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     if(sw["l.sw"])    {
       for(p in store) {
         if(p    %in% eta.store) {
-          proc   <- MCMCpack::procrustes(X=as.matrix(lmat[,,p]), Xstar=l.temp)
+          proc   <- .Procrustes(X=as.matrix(lmat[,,p]), Xstar=l.temp)
           lmat[,,p]        <- proc$X.new
           if(sw["s.sw"])  {
             rot  <- proc$R
@@ -805,6 +806,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     ci.mu        <- Filter(Negate(is.null), lapply(result, "[[", "ci.mu"))
     means        <- list(mus = mus, post.mu = post.mu, var.mu = var.mu, ci.mu = ci.mu)
   }
+  sw["l.sw"]     <- attr(sims, "Switch")["l.sw"] && !all(Q == 0)
   if(sw["l.sw"])   {
     lmats        <- Filter(Negate(is.null), lapply(result, "[[", "loadings"))
     post.load    <- Filter(Negate(is.null), lapply(result, "[[", "post.load"))

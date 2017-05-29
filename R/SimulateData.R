@@ -12,14 +12,15 @@
 #'
 #' @return Invisibly returns a data.frame with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored.
 #' @export
-#' @importFrom corpcor "is.positive.definite" "make.positive.definite"
 #' @importFrom Rfast "is.symmetric"
+#'
+#' @author Keefe Murphy
 #'
 #' @examples
 #' # Simulate 100 observations from 3 balanced groups with cluster-specific numbers of latent factors
-#' # sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5))
-#' # names(attributes(sim_data))
-#' # attr(sim_data, "Labels")
+#' sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5))
+#' names(attributes(sim_data))
+#' attr(sim_data, "Labels")
 #'
 #' # Fit a MIFA model to this data
 #' # tmp      <- mcmc_IMIFA(sim_data, method="MIFA", range.G=3, n.iters=5000)
@@ -36,7 +37,7 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(4L, G), pis = rep(
          length(G) != 1, length(P) != 1)) stop("'N', 'P', 'G', and 'loc.diff' must be of length 1")
   if(!is.numeric(loc.diff))               stop("'loc.diff' must be numeric")
   if(any(N  < 2, N <= G))                 stop("Must simulate more than one data-point and the number of groups cannot exceed N")
-  if(any(Q  > .ledermann(N=N, P=P)))      stop(paste0("Cannot generate this many factors relative to N=", N, " and P=", P))
+  if(any(Q  > .ledermann(N=N, P=P)))      warning(paste0("Are you sure you want to generate this many factors relative to N=", N, " and P=", P, "?"), call.=FALSE)
   if(length(Q) != G) {
     if(!missing(Q))  {
       if(length(Q) == 1) {
@@ -91,8 +92,8 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(4L, G), pis = rep(
     covmat     <- provideDimnames(diag(psi.true) + switch(method, marginal=tcrossprod(l.true), 0), base=list(vnames))
     if(!all(is.symmetric(covmat),
             is.double(covmat)))           stop("Invalid covariance matrix")
-    if(!is.positive.definite(covmat)) {
-      covmat   <- make.positive.definite(covmat)
+    if(!is.posi_def(covmat)) {
+      covmat   <- .make_posdef(covmat)
     }
     sigma      <- if(any(Q.g > 0, method == "conditional")) .chol(covmat) else sqrt(covmat)
     means      <- matrix(mu.true, nrow=N.g, ncol=P, byrow=TRUE) + switch(method, conditional=tcrossprod(eta.true[true.zlab == g, seq_len(Q.g), drop=FALSE], l.true), 0)
