@@ -79,7 +79,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
   defpar$new        <- FALSE
   mispal            <- missing(palette)
   if(mispal)             palette <- viridis(min(10, max(G, Q.max, 5)))
-  if(!all(.are_cols(cols=palette)))   stop("Supplied colour palette contains invalid colours")
+  if(!all(is.cols(cols=palette)))     stop("Supplied colour palette contains invalid colours")
   if(length(palette) < 5)             warning("Palette should contain 5 or more colours", call.=FALSE)
   if(length(transparency) != 1   &&
      any(!is.numeric(transparency),
@@ -110,7 +110,6 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
      c("G", "Q",
        "QG")))  {      plot.meth <- "GQ"
   }
-  uni.type     <- unname(attr(x, "Uni.Meth")['Uni.Type'])
   plot.meth    <- match.arg(plot.meth)
   if(!is.element(plot.meth, c("errors", "GQ", "zlabels")) &&
      missing(param))                  stop("'param' not supplied:\nWhat variable would you like to plot?")
@@ -125,15 +124,14 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
   var.names    <- if(is.null(var.names)) seq_len(n.var) else var.names
   names(v.sw)  <- formals(sys.function(sys.parent()))$param
   ci.sw        <- v.sw
-  all.ind      <- plot.meth == "all"
-  grp.ind      <- !is.element(method, c("FA", "IFA"))
-  if(grp.ind)   {
+  uni.type     <- unname(attr(x, "Uni.Meth")['Uni.Type'])
+  if((grp.ind  <- !is.element(method, c("FA", "IFA")) && !(param == "uniquenesses" && is.element(uni.type, c("constrained", "single"))))) {
     clust      <- x$Clust
     grp.size   <- clust$post.sizes
-    labelmiss  <- !is.null(attr(clust, "Label.Sup")) && !attr(clust, "Label.Sup")
+    labelmiss  <- !is.null(attr(clust, "Label.Sup"))  && !attr(clust, "Label.Sup")
   }
   grp.ind      <- all(G != 1, grp.ind)
-  if(all.ind)   {
+  if((all.ind  <- plot.meth == "all"))    {
     if(v.sw[param]) {
       m.sw[-(1:4)]  <- !m.sw[-(1:4)]
       layout(matrix(c(1, 2, 3, 4), nrow=2, ncol=2, byrow=TRUE))
@@ -150,6 +148,9 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
     x$Loadings$ci.load   <- replace(llist, Q0x, x$Loadings$ci.load)
     x$Loadings$post.load <- replace(llist, Q0x, x$Loadings$post.load)
     x$Loadings$var.load  <- replace(llist, Q0x, x$Loadings$var.load)
+  }
+  if(param == "uniquenesses") {
+    mat   <- switch(uni.type, constrained=, unconstrained=mat, FALSE)
   }
   z.miss  <- missing(zlabels)
   if(!z.miss) {
@@ -242,8 +243,8 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
       Gs  <- if(gx) (if(z.sim) seq_len(3L) else seq_len(2L)) else ifelse(g <=
              ifelse(z.sim, 3, 2), g,  stop(paste0("Invalid 'g' value", ifelse(z.sim, ": similarity matrix not available", ""))))
     }
-  } else if(any(all(is.element(param, c("scores", "pis", "alpha", "discount")), any(all.ind, param != "scores", !m.sw["M.sw"])),
-            m.sw["G.sw"], all(m.sw["P.sw"], param != "loadings"), m.sw["E.sw"]))  {
+  } else if(any(all(is.element(param, c("scores", "pis", "alpha", "discount")), any(all.ind, param != "scores", !m.sw["M.sw"])), m.sw["G.sw"],
+            all(m.sw["P.sw"], param != "loadings"), m.sw["E.sw"], all(param == "uniquenesses", is.element(uni.type, c("constrained", "single")))))  {
     Gs    <- 1L
   } else if(!gx) {
     if(!is.element(method, c("FA", "IFA"))) {
@@ -376,7 +377,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
           if(titles) title(main=list(paste0("Trace", ifelse(all.ind, "", paste0(":\nUniquenesses", ifelse(grp.ind, paste0(" - Group ", g), ""))))))
         } else   {
           plot(x=iter, y=plot.x[ind,], ylab="", type="l", xlab="Iteration")
-          if(titles) title(main=list(paste0("Trace", ifelse(all.ind, ":\n", paste0(":\nUniqueness - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), var.names[ind], " Variable")))
+          if(titles) title(main=list(paste0("Trace", ifelse(all.ind, switch(uni.type, constrained=, unconstrained=paste0(":\n"), ""), paste0(":\nUniquenesses - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), switch(uni.type, constrained=, unconstrained=paste0(var.names[ind], " Variable"), ""))))
         }
       }
       if(param == "pis") {
@@ -424,13 +425,13 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         x.plot <- x$Means$mus[[g]]
         if(matx) {
           if(mispal) palette(viridis(n.var, alpha=transparency))
-          plot.x  <- apply(x.plot, 1, density)
+          plot.x  <- tryCatch(apply(x.plot, 1, density, bw="SJ"), error = function(e) apply(x.plot, 1, density))
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
           matplot(fitx, fity, type="l", xlab="", ylab="", lty=1, col=seq_along(palette()))
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nMeans", ifelse(grp.ind, paste0(" - Group ", g), ""))))))
         } else   {
-          plot.d  <- density(x.plot[ind,])
+          plot.d  <- tryCatch(density(x.plot[ind,], bw="SJ"),     error = function(e) density(x.plot[ind,]))
           plot(plot.d, main="", ylab="")
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", paste0(":\nMeans - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), var.names[ind], " Variable")))
           polygon(plot.d, col=grey, border=NA)
@@ -446,7 +447,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
           if(mispal) palette(viridis(min(10, max(2, Q.max)), alpha=transparency))
         }
         if(matx) {
-          plot.x  <- apply(plot.x, 1, density)
+          plot.x  <- tryCatch(apply(x.plot, 1, density, bw="SJ"),       error = function(e) apply(x.plot, 1, density))
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
           matplot(fitx, fity, type="l", xlab="", ylab="", lty=1, col=seq_along(palette()))
@@ -456,7 +457,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
             if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", ":\nScores - "), "Observation ", obs.names[ind[1]])))
           }
         } else   {
-          plot.d  <- density(x.plot[ind[1],ind[2],])
+          plot.d  <- tryCatch(density(x.plot[ind[1],ind[2],], bw="SJ"), error = function(e) density(x.plot[ind[1],ind[2],]))
           plot(plot.d, main="", ylab="")
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", ":\nScores - "), "Observation ", obs.names[ind[1]], ", Factor ", ind[2])))
           polygon(plot.d, col=grey, border=NA)
@@ -472,7 +473,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
           if(mispal) palette(viridis(min(10, max(2, Q)), alpha=transparency))
         }
         if(matx) {
-          plot.x  <- apply(plot.x, 1, density)
+          plot.x  <- tryCatch(apply(plot.x, 1, density, bw="SJ"),       error = function(e) apply(plot.x, 1, density))
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
           matplot(fitx, fity, type="l", xlab="", ylab="", lty=1, col=seq_along(palette()))
@@ -482,7 +483,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
             if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", paste0(":\nLoadings - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), var.names[ind[1]], " Variable")))
           }
         } else   {
-          plot.d  <- density(x.plot[ind[1],ind[2],])
+          plot.d  <- tryCatch(density(x.plot[ind[1],ind[2],], bw="SJ"), error = function(e) density(x.plot[ind[1],ind[2],]))
           plot(plot.d, main="", ylab="")
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", paste0(":\nLoadings - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), var.names[ind[1]], " Variable, Factor ", ind[2])))
           polygon(plot.d, col=grey, border=NA)
@@ -492,22 +493,16 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         x.plot <- x$Uniquenesses$psis[[g]]
         if(matx) {
           if(mispal) palette(viridis(n.var, alpha=transparency))
-          plot.x  <- apply(x.plot, 1, density)
-          h       <- sapply(plot.x, "[[", "bw")
-          w       <- lapply(seq_along(plot.x), function(d) 1/pnorm(0, mean=x.plot[d,], sd=h[d], lower.tail=FALSE))
-          plot.x  <- lapply(seq_along(plot.x), function(d) suppressWarnings(density(x.plot[d,], bw=h[d], kernel="gaussian", weights=w[[d]]/length(x.plot[d,]))))
+          plot.x  <- apply(x.plot, 1, .logdensity)
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
           matplot(fitx, fity, type="l", xlab="", ylab="", lty=1, col=seq_along(palette()))
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nUniquenesses", ifelse(grp.ind, paste0(" - Group ", g), ""))))))
         } else   {
-          plot.d  <- density(x.plot[ind,])
-          h       <- plot.d$bw
-          w       <- 1/pnorm(0, mean=x.plot[ind,], sd=h, lower.tail=FALSE)
-          plot.d  <- suppressWarnings(density(x.plot[ind,], bw=h, kernel="gaussian", weights=w/length(x.plot[ind,])))
+          plot.d  <- .logdensity(x.plot[ind,])
           plot.d$y[plot.d$x < 0] <- 0
           plot(plot.d, main="", ylab="")
-          if(titles) title(main=list(paste0("Density", ifelse(all.ind, ":\n", paste0(":\nUniquenesses - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), var.names[ind], " Variable")))
+          if(titles) title(main=list(paste0("Density", ifelse(all.ind, switch(uni.type, constrained=, unconstrained=paste0(":\n"), ""), paste0(":\nUniquenesses - ", ifelse(grp.ind, paste0("Group ", g, " - "), ""))), switch(uni.type, constrained=, unconstrained=paste0(var.names[ind], " Variable"), ""))))
           polygon(plot.d, col=grey, border=NA)
         }
       }
@@ -515,14 +510,14 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         x.plot <- clust$pi.prop
         if(matx) {
           if(mispal) palette(viridis(G, alpha=transparency))
-          plot.x  <- lapply(seq_len(G), function(g, x=x.plot[g,]) .logitdensity(x[x > 0 & x < 1]))
+          plot.x  <- lapply(seq_len(G), function(g, x=x.plot[g,]) .logitdensity(x))
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
           matplot(fitx, fity, type="l", ylab="", lty=1, col=seq_along(palette()), xlab="")
           if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nMixing Proportions")))))
         } else   {
           x.plot  <- x.plot[ind,]
-          fit     <- .logitdensity(x.plot[x.plot > 0 & x.plot < 1])
+          fit     <- .logitdensity(x.plot)
           fitx    <- fit$x
           fity    <- fit$y
           plot(fitx, fity, type="l", main="", ylab="", xlab="")
@@ -532,11 +527,8 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
       }
       if(param == "alpha") {
         plot.x <- clust$DP.alpha
-        plot.d <- density(plot.x$alpha)
-        h      <- plot.d$bw
         tr     <- ifelse(attr(x, "Pitman"), - max(clust$PY.disc$discount, 0), 0)
-        w      <- 1/pnorm(tr, mean=plot.x$alpha, sd=h, lower.tail=FALSE)
-        plot.d <- suppressWarnings(density(plot.x$alpha, bw=h, kernel="gaussian", weights=w/length(plot.x$alpha)))
+        plot.d <- .logdensity(plot.x$alpha, left=tr)
         plot.d$y[plot.d$x < tr]  <- 0
         plot(plot.d, main="", ylab="")
         if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nAlpha")))))
@@ -550,23 +542,27 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
       if(param == "discount") {
         plot.x <- clust$PY.disc
         x.plot <- as.vector(plot.x$discount)
-        fit    <- .logitdensity(x.plot[x.plot > 0])
-        fitx   <- fit$x
-        fity   <- fit$y * (1 - plot.x$post.kappa)
-        plot(fitx, fity, type="l", main="", xlab="", ylab="", xlim=c(0, max(fitx)))
-        usr    <- par("usr")
-        if(plot.x$post.kappa > 0)  {
-          clip(usr[1], usr[2], 0, usr[4])
-          abline(v=0,  col=3,  lwd=2)
-          clip(usr[1], usr[2], usr[3], usr[4])
-        }
-        if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nDiscount")))))
-        polygon(c(min(fitx), fitx), c(0, fity), col=grey, border=NA)
-        if(intervals) {
-          avg  <- plot.x$post.disc
-          clip(avg, avg, 0, fity[which.min(abs(fitx - avg))])
-          abline(v=avg, col=2, lty=2)
-          clip(usr[1], usr[2], usr[3], usr[4])
+        fit    <- try(.logitdensity(x.plot), silent = TRUE)
+        if(!inherits(fit, "try-error")) {
+          fitx <- fit$x
+          fity <- fit$y * (1 - plot.x$post.kappa)
+          plot(fitx, fity, type="l", main="", xlab="", ylab="", xlim=c(0, max(fitx)))
+          usr  <- par("usr")
+          if(plot.x$post.kappa > 0)     {
+            clip(usr[1], usr[2], 0,      usr[4])
+            abline(v=0,  col=3,  lwd=2)
+            clip(usr[1], usr[2], usr[3], usr[4])
+          }
+          if(titles) title(main=list(paste0("Density", ifelse(all.ind, "", paste0(":\nDiscount")))))
+          polygon(c(min(fitx), fitx), c(0, fity), col=grey, border=NA)
+          if(intervals) {
+            D  <- plot.x$post.disc
+            clip(D, D, 0, fity[which.min(abs(fitx - D))])
+            abline(v=D, col=2, lty=2)
+            clip(usr[1], usr[2], usr[3], usr[4])
+          }
+        } else {                      warning("Mutation rate too low: can't plot density", call.=FALSE)
+          if(all.ind) plot.new()
         }
       }
     }
@@ -667,7 +663,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
            lxx <- mat2cols(Filter(Negate(is.null), plot.x), cols=hcols, compare=G > 1, na.col=par()$bg)
            lxx <- replace(llist, Q0x, lxx)
           } else {
-           lxx <- mat2cols(plot.x, cols=hcols, compare=G > 1, na.col=par()$bg)
+           lxx <- mat2cols(if(G > 1) plot.x else plot.x[[g]], cols=hcols, compare=G > 1, na.col=par()$bg)
           }
          }
           pxx  <- range(sapply(Filter(Negate(is.null), plot.x), range))
@@ -752,12 +748,13 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         a.adj  <- rep(0.5, 2)
         a.cex  <- par()$fin[2]/ifelse(MH, 4, 3)
         pen    <- ifelse(MH, 0,    0.15)
+        tz     <- isTRUE(attr(x, "TuneZeta"))
         y1     <- switch(param, alpha=0.8, discount=0.85)
         y2     <- switch(param, alpha=0.8, discount=0.85)
         y3     <- switch(param, alpha=0.6, discount=0.65)
         y4     <- switch(param, alpha=0.6, discount=0.65)
-        y5     <- ifelse(MH, switch(param, alpha=0.45, discount=0.5),  0.475)
-        y6     <- ifelse(MH, switch(param, alpha=0.4,  discount=0.45), 0.4)
+        y5     <- ifelse(MH, switch(param, alpha=ifelse(tz, 0.5, 0.45), discount=0.5),  0.475)
+        y6     <- ifelse(MH, switch(param, alpha=ifelse(tz, 0.45, 0.4), discount=0.45), 0.4)
         text(x=0.5, y=y1  - pen, cex=a.cex, col="black", adj=a.adj, expression(bold("Posterior Mean:\n")))
         text(x=0.5, y=y2  - pen, cex=a.cex, col="black", adj=a.adj, bquote(.(round(switch(param, alpha=plot.x$post.alpha, discount=plot.x$post.disc), digits))))
         text(x=0.5, y=y3  - pen, cex=a.cex, col="black", adj=a.adj, expression(bold("\nVariance:\n")))
@@ -766,14 +763,18 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         text(x=0.5, y=y6  - pen, cex=a.cex, col="black", adj=a.adj, bquote(paste("[", .(round(switch(param, alpha=plot.x$ci.alpha[1], discount=plot.x$ci.disc[1]), digits)), ", ", .(round(switch(param, alpha=plot.x$ci.alpha[2], discount=plot.x$ci.disc[2]), digits)), "]")))
         if(isTRUE(MH)) {
           rate <- switch(param,  alpha="Acceptance Rate:", discount="Mutation Rate:")
-          y7   <- switch(param,  alpha=0.25, discount=0.325)
-          y8   <- switch(param,  alpha=0.2,  discount=0.275)
+          y7   <- switch(param,  alpha=ifelse(tz, 0.325, 0.25), discount=0.325)
+          y8   <- switch(param,  alpha=ifelse(tz, 0.275, 0.2),  discount=0.275)
           text(x=0.5, y=y7,      cex=a.cex, col="black", adj=a.adj, substitute(bold(rate)))
           text(x=0.5, y=y8,      cex=a.cex, col="black", adj=a.adj, bquote(paste(.(round(100 * switch(param, alpha=plot.x$alpha.rate, discount=plot.x$disc.rate), 2)), "%")))
         }
         if(param == "discount") {
           text(x=0.5, y=0.15,    cex=a.cex, col="black", adj=a.adj, bquote(bold(hat(kappa)) * bold(" - Posterior Proportion of Zeros:")))
           text(x=0.5, y=0.1,     cex=a.cex, col="black", adj=a.adj, bquote(.(round(plot.x$post.kappa, digits))))
+        }
+        if(param == "alpha" && tz) {
+          text(x=0.5, y=0.175,   cex=a.cex, col="black", adj=a.adj, bquote(bold(hat(zeta)) * bold(" - Posterior Mean Zeta:")))
+          text(x=0.5, y=0.1,     cex=a.cex, col="black", adj=a.adj, bquote(.(round(plot.x$avg.zeta, digits))))
         }
       }
       if(!indx) {         ind[1] <- xind[1]
@@ -964,8 +965,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
       if(all(g  == 3, z.sim)) {
         plot.x  <- as.matrix(clust$Z.avgsim$z.sim)
         perm    <- order(clust$map)
-        p.ind   <- !identical(perm, clust$map)
-        plot.x  <- if(p.ind) plot.x[perm,perm] else plot.x
+        plot.x  <- if((p.ind <- !identical(perm, clust$map))) plot.x[perm,perm] else plot.x
         plot.x  <- t(plot.x[,seq(from=ncol(plot.x), to=1, by=-1)])
         par(defpar)
         if(titles) par(mar=c(4.1, 4.1, 4.1, 4.1))
@@ -980,7 +980,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         box(lwd=2)
         if(p.ind)                     message("Rows and columns of similarity matrix reordered to correspond to MAP clustering")
       }
-      if(all(g  != 3, g == min(Gs))) {
+      if(all(g  != 3, g == min(Gs)))  {
         prf     <- NULL
         if(any(!labelmiss,  !z.miss)) {
           if(all(!labelmiss, z.miss)) {
@@ -1020,21 +1020,29 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
     if(m.sw["P.sw"]) {
       plot.x <- switch(param, means=x$Means$post.mu, uniquenesses=x$Uniquenesses$post.psi, x$Loadings$post.load[[g]])
       x.plot <- apply(plot.x, 1L, range, na.rm=TRUE)
-      plot.x <- if(all(param == "uniquenesses", uni.type == "isotropic")) plot.x else apply(plot.x, 2L, function(x) (x - min(x, na.rm=TRUE))/(max(x, na.rm=TRUE) - min(x, na.rm=TRUE)))
+      plot.x <- if(param == "uniquenesses" && is.element(uni.type, c("isotropic", "single"))) plot.x else apply(plot.x, 2L, function(x) (x - min(x, na.rm=TRUE))/(max(x, na.rm=TRUE) - min(x, na.rm=TRUE)))
       varnam <- paste0(toupper(substr(param, 1, 1)), substr(param, 2, nchar(param)))
       if(any(grp.ind, param == "loadings")) {
-        if(mispal) palette(viridis(max(Q, 2), alpha=transparency))
+        if(mispal) palette(viridis(max(switch(param, loadings=Q, G), 2), alpha=transparency))
         layout(rbind(1, 2), heights=c(9, 1))
         par(mar=c(3.1, 4.1, 4.1, 2.1))
       }
       jitcol <- switch(param, loadings=Q, G)
-      matplot(seq_len(n.var) + matrix(rnorm(jitcol * n.var, 0, min(0.1, 1/n.var^2)), nrow=n.var, ncol=jitcol), plot.x, type=switch(param, uniquenesses=switch(uni.type, unconstrained="p", isotropic="l"), "p"),
-                        col=switch(param, loadings=seq_len(Q), seq_len(G)), pch=15, xlab="Variable", ylab=paste0("Standardised ", varnam), axes=FALSE, main=paste0("Parallel Coordinates: ", varnam, ifelse(all(grp.ind, param == "loadings"), paste0("\n Group ", g), "")), lty=1)
-      axis(1, at=seq_len(n.var), labels=if(titles && n.var < 100) rownames(plot.x) else rep("", n.var), cex.axis=0.5, tick=FALSE)
+      jit.x  <- G == 1 || (param == "uniquenesses" && uni.type == "constrained")
+      type.u <- ifelse(type.x, switch(param, uniquenesses=switch(uni.type, constrained=, unconstrained="p", single=, isotropic="l"), "p"), type)
+      if(!is.element(type.u,
+                     c("l", "p")))    stop("Invalid 'type' for parallel coordinates plot")
+      matplot(seq_len(n.var) + if(!jit.x) switch(type.u, p=matrix(rnorm(jitcol * n.var, 0, min(0.1, max(1e-02, 1/n.var^2))), nrow=n.var, ncol=jitcol), 0) else 0,
+              plot.x, type=type.u, pch=15, col=switch(param, loadings=seq_len(Q), seq_len(G)), xlab=switch(uni.type, constrained=, unconstrained="Variable", ""),
+              lty=1, ylab=paste0(switch(param, uniquenesses=switch(uni.type, constrained=, unconstrained="Standardised ", ""), "Standardised "), varnam),
+              xaxt="n", bty="n", main=paste0("Parallel Coordinates: ", varnam, ifelse(all(grp.ind, param == "loadings"), paste0("\n Group ", g), "")))
+      axis(1, at=seq_len(n.var), labels=if(titles && n.var < 100) rownames(plot.x) else rep("", n.var), cex.axis=0.5, tick=FALSE, line=-0.5)
       for(i in seq_len(n.var))    {
         lines(c(i, i), c(0, 1), col=grey)
         if(titles && n.var < 100) {
-          text(c(i, i), c(0, 1), labels=format(x.plot[,i], digits=3), xpd=NA, offset=0.3, pos=c(1, 3), cex=0.5)
+          text(c(i, i), c(switch(param, uniquenesses=switch(uni.type, single=, isotropic=par("usr")[3], 0), 0),
+               switch(param, uniquenesses=switch(uni.type, single=, isotropic=par("usr")[4], 1), 1)),
+               labels=format(x.plot[,i], digits=3), xpd=NA, offset=0.3, pos=c(1, 3), cex=0.5)
         }
       }
       if(any(grp.ind, param  == "loadings")) {
@@ -1134,12 +1142,12 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         plot.x <- x$Uniquenesses$psis[[g]]
         if(!partial) {
           acf(plot.x[ind,], main="", ci.col=4, ylab="")
-          if(titles) title(main=list(paste0("ACF", ifelse(all.ind, paste0(":\n", var.names[ind], " Variable"), ""))))
+          if(titles) title(main=list(paste0("ACF",  ifelse(all.ind, switch(uni.type, constrained=, unconstrained=paste0(":\n", var.names[ind], " Variable"), ""), ""))))
         }
         if(any(!all.ind, partial)) {
           acf(plot.x[ind,], main="", type="partial", ci.col=4, ylab="")
-          if(titles) title(main=list(paste0("PACF", ifelse(partial, paste0(":\n", var.names[ind], " Variable"), ""))))
-          if(all(!all.ind, titles)) title(main=list(paste0("Uniquenesses - ", ifelse(grp.ind, paste0("Group ", g, ":\n "), ""), var.names[ind], " Variable")), outer=TRUE)
+          if(titles) title(main=list(paste0("PACF", ifelse(partial, switch(uni.type, constrained=, unconstrained=paste0(":\n", var.names[ind], " Variable"), ""), ""))))
+          if(all(!all.ind, titles)) title(main=list(paste0("Uniquenesses - ", ifelse(grp.ind, paste0("Group ", g, ":\n "), ""), switch(uni.type, constrained=, unconstrained=paste0(var.names[ind], " Variable"), ""))), outer=TRUE)
         }
       }
       if(param == "pis")  {
@@ -1194,7 +1202,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 #' @export
 #' @importFrom viridis "viridis"
 #'
-#' @seealso \code{\link{plot_cols}}, \code{\link{heat_legend}}
+#' @seealso \code{\link{plot_cols}}, \code{\link{heat_legend}}, \code{\link{is.cols}}
 #'
 #' @examples
 #' # Generate a colour matrix using mat2cols()
@@ -1250,7 +1258,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
         breaks <- length(cols)
       }
     }
-    if(!all(.are_cols(cols)))         stop("Invalid colours supplied")
+    if(!all(is.cols(cols)))           stop("Invalid colours supplied")
     if(any(!is.logical(byrank),
            length(byrank)  != 1))     stop("'byrank' must be TRUE or FALSE")
     if(any(!is.numeric(breaks),
@@ -1258,10 +1266,9 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
     m1         <- if(isTRUE(byrank))  rank(mat) else mat
     facs       <- cut(m1, breaks, include.lowest=TRUE)
     answer     <- matrix(cols[as.numeric(facs)], nrow=nrow(mat), ncol=ncol(mat))
-    NM         <- is.na(mat)
-    if(any(NM)) {
+    if(any((NM <- is.na(mat)))) {
       if(length(na.col     != 1)  &&
-         !.are_cols(na.col))          stop("'na.col' must be a valid colour in the presence of missing data")
+         !is.cols(na.col))            stop("'na.col' must be a valid colour in the presence of missing data")
       answer   <- replace(answer, NM, na.col)
     }
     rownames(answer)       <- rownames(mat)
@@ -1274,8 +1281,22 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
   }
 
 # Colour Checker
-  .are_cols    <- function(cols) {
-    vapply(cols,  function(x) { tryCatch(is.matrix(col2rgb(x)), error = function(e) FALSE) }, logical(1L))
+#' Check for Valid Colours
+#'
+#' Checks if the supplied vector contains valid colours.
+#' @param cols A vector of colours, usually as a character string.
+#'
+#' @return A logical vector of length \code{length(cols)} which is \code{TRUE} for entries which are valid colours and \code{FALSE} otherwise.
+#' @export
+#'
+#' @examples
+#' all(is.cols(1:5))
+#'
+#' all(is.cols(heat.colors(30)))
+#'
+#' any(!is.cols(c("red", "green", "aquamarine")))
+  is.cols      <- function(cols) {
+    vapply(cols,  function(x)    { tryCatch(is.matrix(col2rgb(x)), error = function(e) FALSE) }, logical(1L))
   }
 
 # Heatmap Legends
@@ -1288,7 +1309,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 #' @return Modifies an existing plot by adding a legend.
 #' @export
 #'
-#' @seealso \code{\link[graphics]{image}}, \code{\link{plot_cols}}, \code{\link{mat2cols}}
+#' @seealso \code{\link[graphics]{image}}, \code{\link{plot_cols}}, \code{\link{mat2cols}}, \code{\link{is.cols}}
 #' @examples
 #' # Generate a matrix, flip it, and plot it with a legend
 #' data <- matrix(rnorm(50), nrow=10, ncol=5)
@@ -1321,7 +1342,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 # Prior No. Groups (DP & PY)
 #' Plot Dirichlet / Pitman-Yor process Priors
 #'
-#' Plots the prior distribution of the number of clusters under a Dirichlet / Pitman-Yor process prior, for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}. All arguments are vectorised. Requires use of the \code{Rmpfr} and \code{gmp} libraries. May encounter difficulty and slowness for large \code{N}, especially with non-zero \code{discount}. Users can also consult \code{\link{G_expected}} and \code{\link{G_variance}} in order to solicit sensible priors.
+#' Plots the prior distribution of the number of clusters under a Dirichlet / Pitman-Yor process prior, for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}. All arguments are vectorised. Users can also consult \code{\link{G_expected}} and \code{\link{G_variance}} in order to solicit sensible priors.
 #' @param N The sample size.
 #' @param alpha The concentration parameter. Must be specified and must be strictly greater than \code{-discount}.
 #' @param discount The discount parameter for the Pitman-Yor process. Must lie in the interval [0, 1). Defaults to 0 (i.e. the Dirichlet process).
@@ -1331,6 +1352,8 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 #' @export
 #' @importFrom viridis "viridis"
 #' @seealso \code{\link{G_expected}}, \code{\link{G_variance}}, \code{\link[Rmpfr]{Rmpfr}}
+#'
+#' @note Requires use of the \code{Rmpfr} and \code{gmp} libraries; may encounter difficulty and slowness for large \code{N}, especially with non-zero \code{discount} values.
 #'
 #' @author Keefe Murphy
 #'
@@ -1422,7 +1445,7 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 #' @return Either an \code{"image"} or \code{"points"} plot of the supplied colours.
 #' @export
 #'
-#' @seealso \code{\link{mat2cols}}, \code{\link[graphics]{image}}
+#' @seealso \code{\link{mat2cols}}, \code{\link[graphics]{image}}, \code{\link{heat_legend}}, \code{\link{is.cols}}
 #'
 #' @examples
 #' # Generate a colour matrix using mat2cols()
@@ -1440,11 +1463,11 @@ plot.Results_IMIFA  <- function(x = NULL, plot.meth = c("all", "correlation", "d
 #' heat_legend(mat, cols=cols); box(lwd=2)
   plot_cols    <- function(cmat, na.col = "#808080FF", ptype = c("image", "points"), border.col = "#808080FF",
                            dlabels = NULL, rlabels = FALSE, clabels = FALSE, pch = 15, cex = 3, label.cex = 0.6, ...) {
-    if(!all(.are_cols(cmat),
+    if(!all(is.cols(cmat),
             is.matrix(cmat)))         stop("'cmat' needs to be a valid colour matrix:\ntry supplying a vector as a matrix with 1 row or column, as appropriate")
-    if(!all(.are_cols(na.col),
+    if(!all(is.cols(na.col),
             length(na.col)     == 1)) stop("'na.col' needs to a valid single colour")
-    if(!all(.are_cols(border.col),
+    if(!all(is.cols(border.col),
             length(border.col) == 1)) stop("'border.col' needs to a valid single colour")
     ptype      <- match.arg(ptype)
     N          <- nrow(cmat)

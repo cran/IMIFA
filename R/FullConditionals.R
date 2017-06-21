@@ -16,33 +16,47 @@
       u.eta      <- diag(Q) + crossprod(load.psi, lmat)
       u.eta      <- if(Q1) sqrt(u.eta) else .chol(u.eta)
       mu.eta     <- c.data %*% (load.psi %*% if(Q1) 1/(u.eta * u.eta) else chol2inv(u.eta))
-        mu.eta    + t(backsolve(u.eta, matrix(rnorm(Q * N), nrow=Q, ncol=N)))
+        mu.eta    + t(backsolve(u.eta, matrix(rnorm(length(mu.eta)), nrow=Q, ncol=N)))
     }
 
   # Loadings
     .sim_load    <- function(l.sigma, Q, c.data, eta, psi.inv, EtE, Q1)  {
       u.load     <- l.sigma + psi.inv * EtE
       u.load     <- if(Q1) sqrt(u.load) else .chol(u.load)
-      mu.load    <- psi.inv * (if(Q1) 1/(u.load * u.load) else chol2inv(u.load)) %*% crossprod(eta, c.data)
-        mu.load   + backsolve(u.load, rnorm(Q))
+        psi.inv   * (if(Q1) 1/(u.load * u.load) else chol2inv(u.load)) %*% crossprod(eta, c.data) + backsolve(u.load, rnorm(Q))
     }
 
     .sim_load_s  <- function(Q, c.data, eta, phi, tau, psi.inv, EtE, Q1) {
       u.load     <- diag(phi * tau, Q) + psi.inv * EtE
       u.load     <- if(Q1) sqrt(u.load) else .chol(u.load)
-      mu.load    <- psi.inv  * (if(Q1) 1/(u.load * u.load) else chol2inv(u.load)) %*% crossprod(eta, c.data)
-        mu.load   + backsolve(u.load, rnorm(Q))
+        psi.inv   * (if(Q1) 1/(u.load  * u.load) else chol2inv(u.load)) %*% crossprod(eta, c.data) + backsolve(u.load, rnorm(Q))
     }
 
   # Uniquenesses
-    .sim_psi_iu  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat) {
-      S.mat      <- c.data - tcrossprod(eta, lmat)
+    .sim_psi_uuu <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat) {
+      S.mat      <- c.data  - tcrossprod(eta, lmat)
         rgamma(P, shape=N/2 + psi.alpha, rate=colSums(S.mat * S.mat)/2 + psi.beta)
     }
 
-    .sim_psi_ii  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat) {
+    .sim_psi_uuc <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat) {
       S.mat      <- c.data - tcrossprod(eta, lmat)
         rep(rgamma(1, shape=(N * P)/2 + psi.alpha, rate=sum(S.mat * S.mat)/2 + psi.beta), P)
+    }
+
+    .sim_psi_ucu <- function(u.shape, psi.beta, S.mat, V) {
+      rgamma(V, shape=u.shape, rate=colSums(do.call(rbind, S.mat))/2 + psi.beta)
+    }
+
+    .sim_psi_ucc <- function(u.shape, psi.beta, S.mat, V = 1) {
+      rgamma(V, shape=u.shape, rate=sum(unlist(S.mat))/2 + psi.beta)
+    }
+
+    .sim_psi_u1  <- function(u.shape, psi.beta, S.mat, V) {
+      rgamma(V, shape=u.shape, rate=colSums(S.mat * S.mat)/2 + psi.beta)
+    }
+
+    .sim_psi_c1  <- function(u.shape, psi.beta, S.mat, V = 1) {
+      rgamma(V, shape=u.shape, rate=sum(S.mat * S.mat)/2 + psi.beta)
     }
 
   # Local Shrinkage
@@ -62,13 +76,16 @@
   # Mixing Proportions
 #' Simulate Mixing Proportions from a Dirichlet Distribution
 #'
-#' Generates samples from the Dirichlet distrubution with parameter \code{alpha} efficiently by simulating Gamma(\code{alpha}, 1) random variables and normalising them. Please note that while this is available as a standalone function, no checks are performed in order to make its use for \emph{finite} mixture models in \code{\link{mcmc_IMIFA}} faster.
+#' Generates samples from the Dirichlet distrubution with parameter \code{alpha} efficiently by simulating Gamma(\code{alpha}, 1) random variables and normalising them.
 #' @param G The number of groups for which weights need to be sampled.
 #' @param alpha The Dirichlet hyperparameter, either of length 1 or \code{G}. When the length of \code{alpha} is 1, this amounts to assuming an exchangeable prior. Be warned that this will be recycled if necessary.
 #' @param nn A vector giving the number of observations in each of G groups so that Dirichlet posteriors rather than priors can be sampled from. This defaults to 0, i.e. simulation from the prior. Be warned that this will be recycled if necessary.
 #'
 #' @return A Dirichlet vector of \code{G} weights which sum to 1.
-#' @references Devroye, L. (1986) \emph{Non-Uniform Random Variate Generation}, Springer-Verlag, New York, 1986, p.594.
+#'
+#' @note Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.
+#'
+#' @references Devroye, L. (1986) \emph{Non-Uniform Random Variate Generation}, Springer-Verlag, New York, p. 594.
 #' @export
 #'
 #' @examples
@@ -90,16 +107,15 @@
   # Cluster Labels
 #' Simulate Cluster Labels from Unnormalised Log-Probabilities using the Gumbel-Max Trick
 #'
-#' Samples cluster labels for N observations from G groups efficiently using log-probabilities and the so-called Gumbel-Max trick, without requiring that the log-probabilities need to be normalised; thus redunant computation can be avoided. Computation takes place on the log scale for stability/underflow reasons (to ensure negligible probabilities won't cause computational difficulties); in any case, many functions for calculating multivariate normal densities already output on the log scale. Please note that while the function is available for standalone use that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.
+#' Samples cluster labels for N observations from G groups efficiently using log-probabilities and the so-called Gumbel-Max trick, without requiring that the log-probabilities be normalised; thus redunant computation can be avoided. Computation takes place on the log scale for stability/underflow reasons (to ensure negligible probabilities won't cause computational difficulties); in any case, many functions for calculating multivariate normal densities already output on the log scale.
 #' @param probs An N x G matrix of unnormalised probabilities on the log scale, where N is he number of observations that require labels to be sampled and G is the number of active clusters s.t. sampled labels can take values in \code{1:G}.
-#' @param log.like A logical indicating whether the normalising constant is to be computed. Defaults to \code{FALSE} but is \code{TRUE} for all methods under \code{\link{mcmc_IMIFA}} where it's necessary for computation of the log-likelihoods required for model choice.
-#' @param slice A logical indicating whether or not the indicator correction for slice sampling has been applied to \code{probs}. Defaults to \code{FALSE} but is \code{TRUE} for the "\code{IMIFA}" and "\code{IMFA}" methods under \code{\link{mcmc_IMIFA}}. Details of this correction are given in Murphy et. al. (2017).
-#' @return Either a N-vector of sampled cluster labels, or if \code{isTRUE(log.like)}, a list with two elements:
-#' \describe{
-#' \item{z}{The numeric vector of \code{N} sampled cluster labels, with the largest label no greater than \code{G}.}
-#' \item{log.like}{The log-likelihood(s), given by the normalising constant(s), computed with the aid of \code{\link[matrixStats]{rowLogSumExps}}.}
-#' }
+#' @param slice A logical indicating whether or not the indicator correction for slice sampling has been applied to \code{probs}. Defaults to \code{FALSE} but is \code{TRUE} for the "\code{IMIFA}" and "\code{IMFA}" methods under \code{\link{mcmc_IMIFA}}. Details of this correction are given in Murphy et. al. (2017). When set to \code{TRUE}, this results in a speed-improvement when \code{probs} contains non-finite values (e.g. \code{-Inf}, corresponding to zero on the probability scale).
+#' @return A vector of N sampled cluster labels, with the largest label no greater than G.
 #' @seealso \code{\link{mcmc_IMIFA}}, \code{\link[matrixStats]{rowLogSumExps}}
+#'
+#' @note Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.\cr
+#' If the normalising constant is required for another reason, e.g. to compute the log-likelihood, it can be calculated by summing the output obtained by calling \code{\link[matrixStats]{rowLogSumExps}} on \code{probs}.
+#'
 #' @references Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \href{https://arxiv.org/abs/1701.07010}{arXiv:1701.07010}.
 #'
 #' Yellot, J. I. Jr. (1977) The relationship between Luce's choice axiom, Thurstone's theory of comparative judgment, and the double exponential distribution, \emph{Journal of Mathematical Psychology}, 15: 109-144.
@@ -108,10 +124,9 @@
 #' @author Keefe Murphy
 #'
 #' @examples
-#' # Set the dimensions & simulate a matrix of weights
-#'   N         <- 1
+#' # Create a 1-row matrix of weights
 #'   G         <- 3
-#'   weights   <- matrix(c(1, 2, 3), nrow=N, ncol=G)
+#'   weights   <- matrix(c(1, 2, 3), nrow=1, ncol=G)
 #'
 #' # Call gumbel_max() repeatedly to obtain samples of the labels, zs
 #'   iters     <- 10000
@@ -128,16 +143,14 @@
 #'   sizes   <- seq(from=85, to=15, by=-10)
 #'   weights <- matrix(rDirichlet(N * G, alpha=1, nn=sizes), byrow=TRUE, nrow=N, ncol=G)
 #'   zs      <- gumbel_max(probs=log(weights))
-    gumbel_max   <- function(probs, log.like = FALSE, slice = FALSE) {
-      if(isTRUE(slice))    {
-        fp       <- is.finite(probs)
-        zs       <- max.col(replace(probs, fp, probs[fp] - log(rexp(sum(fp)))))
-      } else {
-        N        <- nrow(probs)
-        G        <- ncol(probs)
-        zs       <- max.col(probs - log(matrix(rexp(N * G), nrow=N, ncol=G)))
-      }
-        return(if(isTRUE(log.like)) list(z = zs, log.like=rowLogSumExps(probs)) else zs)
+    gumbel_max   <- function(probs, slice = FALSE) {
+     if(isTRUE(slice)) {
+      fps        <- is.finite(probs)
+      probs[fps] <- probs[fps] - log(rexp(sum(fps)))
+     } else   {
+      probs      <- probs - log(rexp(length(probs)))
+     }
+      max.col(probs)
     }
 
   # Alpha
@@ -161,7 +174,12 @@
       propinter  <- c(max( - discount, propa   - zeta),  propa + zeta)
       logpr      <- pprob  - cprob   - log(diff(propinter))    + log(diff(inter))
       acpt       <- logpr >= 0  ||   - rexp(1) < logpr
-        return(list(alpha  = ifelse(acpt, propa, alpha), rate  = acpt))
+        return(list(alpha  = ifelse(acpt, propa, alpha), rate  = acpt, l.prob = logpr))
+    }
+
+  # Adaptively Tune Zeta
+    .tune_zeta   <- function(zeta, time, l.rate, heat = 1, target = 0.441, lambda = 1) {
+      exp(heat/time^lambda * (exp(min(0, l.rate)) - target)) * zeta
     }
 
   # Discount
@@ -197,7 +215,7 @@
 
   # Loadings
     .sim_load_p  <- function(Q, P, sigma.l) {
-        sqrt(sigma.l) * base::matrix(rnorm(P * Q), nrow=P, ncol=Q)
+        sqrt(sigma.l) * rnorm(P * Q)
     }
 
     .sim_load_ps <- function(Q, sigma.l, phi, tau) {
@@ -209,7 +227,7 @@
         rgamma(n=P, shape=psi.alpha, rate=psi.beta)
     }
 
-    .sim_psi_ipi <- function(P, psi.alpha, psi.beta) {
+    .sim_psi_ipc <- function(P, psi.alpha, psi.beta) {
         rep(rgamma(1, shape=psi.alpha, rate=psi.beta), P)
     }
 
@@ -263,20 +281,50 @@
       if(any(!is.numeric(shape),
              length(shape) != 1))          stop("'shape' must be a single digit")
       inv.cov   <- try(base::solve(covar), silent=TRUE)
-      if(inherits(inv.cov, "try-error"))  {
-        inv.cov <- .moore_inv(covar)
+      if(inherits(inv.cov, "try-error"))   {
+        covsvd  <- svd(covar)
+        posi    <- covsvd$d > max(sqrt(.Machine$double.eps) * covsvd$d[1L], 0)
+        inv.cov <- if(all(posi)) covsvd$v %*% (t(covsvd$u)/covsvd$d) else if(!any(posi))
+                   array(0, dim(covar)[2L:1L]) else covsvd$v[,posi, drop=FALSE] %*% (t(covsvd$u[,posi, drop=FALSE])/covsvd$d[posi])
       }
         unname((shape - 1)/switch(match.arg(type), unconstrained=diag(inv.cov),
                                   isotropic=rep(exp(mean(log(diag(inv.cov)))), ncol(covar))))
     }
 
   # Alpha/Discount Shifted Gamma Hyperparameters
-    .shift_GA   <- function(shape, rate, shift = 0L, param = c("rate", "scale")) {
-      var       <- shape/rate^2
-      exp       <- var  * rate + shift
+#' Moment Matching Parameters of Shifted Gamma Distributions
+#'
+#' This function takes shape and rate parameters of a Gamma distribution and modifies them to achieve the same expected value and variance when the left extent of the support of the distribution is shifted up or down.
+#' @param shape Shape parameter a of a Gamma(a, b) distribution. Must be strictly positive.
+#' @param rate Rate parameter b of a Gamma(a, b) distribution. Must be strictly positive.
+#' @param shift Modifier, such that the Gamma distribution has support on (\code{shift}, \eqn{\infty}). Can be positive or negative, though typically negative and small.
+#' @param param Switch controlling whether the supplied \code{rate} parameter is indeed a rate, or actually a scale parameter. Also governs whether the output is given in terms of rate or scale. Defaults to "\code{rate}".
+#'
+#' @return A list of length 2, containing the modified shape and rate parameters, respectively.
+#' @export
+#'
+#' @author Keefe Murphy
+#'
+#' @examples
+#' # Shift a Ga(shape=4, rate=2) distribution to the left by 1;
+#' # achieving the same expected value of 2 and variance of 1.
+#' shift_GA(4, 2, -1)
+    shift_GA    <- function(shape, rate, shift = 0L, param = c("rate", "scale")) {
+      if(length(shape) > 1 ||
+        !is.numeric(shape) || shape <= 0) stop("Argument 'shape' must be a single strictly positive number")
+      if(length(rate)  > 1 ||
+        !is.numeric(rate)  || rate  <= 0) stop("Argument 'rate' must be a single strictly positive number")
+      if(length(shift) > 1 ||
+        !is.numeric(shift))               stop("Argument 'shift' must be a single number")
+      param     <- match.arg(param)
+      rate      <- switch(param, rate=rate, 1/rate)
+      exp       <- shape/rate
+      if(shift  >= exp)                   warning("This expected value is not achievable with the supplied 'shift'", call.=FALSE)
+      var       <- exp/rate
+      exp       <- pmax(var * rate   - shift, 0)
       rate      <- exp/var
       shape     <- rate * exp
-        return(list(shape = shape, rate = switch(match.arg(param), rate=rate, 1/rate)))
+        return(list(shape   = shape, rate = switch(param, rate=rate, 1/rate)))
     }
 
   # Check Shrinkage Hyperparemeters
@@ -350,13 +398,16 @@
   # Number of 'free' parameters
 #' Estimate the Number of Free Parameters in Finite Factor Analytic Mixture Models (PGMM)
 #'
-#' Estimates the dimension of the 'free' parameters in fully finite factor analytic mixture models, otherwise known as Parsimonious Gaussian Mixture Models (PGMM). This is used to calculate the penalty terms for the \code{aic.mcmc} and \code{bic.mcmc} model selection criteria implemented in \code{\link{get_IMIFA_results}} for \emph{finite} factor models (though \code{\link{mcmc_IMIFA}} currently only implements \code{UUU} and \code{UUC} covariance structures). Please note that while this available as a standalone function, no checks are performed in order to make its use in \code{\link{get_IMIFA_results}} faster.
+#' Estimates the dimension of the 'free' parameters in fully finite factor analytic mixture models, otherwise known as Parsimonious Gaussian Mixture Models (PGMM). This is used to calculate the penalty terms for the \code{aic.mcmc} and \code{bic.mcmc} model selection criteria implemented in \code{\link{get_IMIFA_results}} for \emph{finite} factor models (though \code{\link{mcmc_IMIFA}} currently only implements \code{UUU} and \code{UUC} covariance structures).
 #' @param Q The number of latent factors (which can be 0, corresponding to a model with diagonal covariance). This argument is vectorised.
 #' @param P The number of variables.
 #' @param G The number of groups. This defaults to 1.
 #' @param method By default, calculation assumes the \code{UUU} model with unconstrained loadings and unconstrained isotropic uniquesses. The other seven models detailed in McNicholas and Murphy (2008) are also given. The first letter denotes whether loadings are constrained/unconstrained across groups; the second letter denotes the same for the uniquenesses; the final letter denotes whether uniquenesses are in turn constrained to be isotropic.
 #'
 #' @return A vector of length \code{length(Q)}.
+#'
+#' @note Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.
+#'
 #' @export
 #' @references McNicholas, P. D. and Murphy, T. B. (2008) Parsimonious Gaussian Mixture Models, \emph{Statistics and Computing}, 18(3): 285-296.
 #' @seealso \code{\link{get_IMIFA_results}}, \code{\link{mcmc_IMIFA}}
@@ -412,7 +463,7 @@
   # Similarity matrix and 'average' clustering
 #' Summarises MCMC clustering labels with a similarity matrix and finds the 'average' clustering
 #'
-#' This functions takes a Monte Carlo sample of cluster labels, converts them to adjacency matrices, and computes a similarity matrix as an average of the adjacency matrices. The dimension of the similarity matrix is invariant to label switching and the number of clusters in each sample. As a summary of the posterior clustering, the index of the clustering with minimum squared distance to this 'average' clustering is reported. Please note that this function is implemented purely in R and as such its performance in terms of speed and memory may not be optimal; it can take quite a considerable amount of time to run, and may crash if the number of observations &/or number of iterations is so large that the similarity matrix is insufficiently sparse. This function can optionally be called inside \code{\link{get_IMIFA_results}}.
+#' This functions takes a Monte Carlo sample of cluster labels, converts them to adjacency matrices, and computes a similarity matrix as an average of the adjacency matrices. The dimension of the similarity matrix is invariant to label switching and the number of clusters in each sample. As a summary of the posterior clustering, the index of the clustering with minimum squared distance to this 'average' clustering is reported.
 #' @param zs A matrix containing samples of clustering labels where the rows correspond to the number of observations and the columns correspond to the number of iterations.
 #'
 #' @return A list containing three elements:
@@ -422,6 +473,8 @@
 #' \item{dist.z}{A vector of length N recording the distances between each clustering and the 'average' clustering.}
 #' }
 #' @export
+#'
+#' @note This function is implemented purely in R and as such its performance in terms of speed and memory may not be optimal; it can take quite a considerable amount of time to run, and may crash if the number of observations &/or number of iterations is so large that the similarity matrix is insufficiently sparse. This function can optionally be called inside \code{\link{get_IMIFA_results}}.
 #' @seealso \code{\link{get_IMIFA_results}}, \code{\link[slam]{as.simple_triplet_matrix}}, \code{\link[stats]{hclust}}
 #'
 #' @author Keefe Murphy
@@ -461,9 +514,9 @@
   # Move 1
     .lab_move1  <- function(nn.ind, pi.prop, nn) {
       sw        <- sample(nn.ind, 2L)
-      pis       <- pi.prop[sw]
+      log.pis   <- log(pi.prop[sw])
       nns       <- nn[sw]
-      a.prob    <- (nns[1] - nns[2]) * (log(pis[1])    - log(pis[2]))
+      a.prob    <- (nns[1] - nns[2]) * (log.pis[1]     - log.pis[2])
         return(list(rate1  = a.prob >= 0 || - rexp(1)  < a.prob, sw = sw))
     }
 
@@ -472,40 +525,139 @@
       sw        <- sample(G, 1L, prob=c(rep(1, G - 2), 0.5, 0.5))
       sw        <- if(is.element(sw, c(G, G - 1))) c(G - 1, G) else c(sw, sw + 1)
       nns       <- nn[sw]
-      Vsw       <- Vs[sw]
-      a.prob    <- nns[1] * log1p(- Vsw[2]) - nns[2]   * log1p(- Vsw[1])
-      a.prob    <- ifelse(is.nan(a.prob),   - Inf, a.prob)
+      log.vs    <- log1p( - Vs[sw])
+      a.prob    <- nns[1] * log.vs[2]       - nns[2]   * log.vs[1]
+      a.prob[is.nan(a.prob)]       <-       - Inf
         return(list(rate2 = a.prob >= 0  || - rexp(1)  < a.prob, sw = sw))
     }
 
   # Positive-(Semi)Definite Checker
-
     #' Check Postive-(Semi)definiteness of a matrix
     #'
-    #' Tests whether all eigenvalues of a symmetric matrix are positive (or strictly non-negative).
+    #' Tests whether all eigenvalues of a symmetric matrix are positive (or strictly non-negative) to check for positive-definiteness and positive-semidefiniteness, respectively. If the supplied matrix doesn't satisfy the test, the nearest matrix which does can optionally be returned.
     #' @param x A matrix, assumed to be real and symmetric.
     #' @param tol Tolerance for singular values and for absolute eigenvalues - only those with values larger than tol are considered non-zero (default: tol = \code{max(dim(x))*max(E)*.Machine$double.eps}, where \code{E} is the vector of absolute eigenvalues).
     #' @param semi Logical switch to test for positive-semidefiniteness when \code{TRUE} or positive-definiteness when \code{FALSE} (the default).
+    #' @param make Logical switch to return the nearest matrix which satisifies the test - if the test has been passed, this is of course just \code{x} itself, otherwise the nearest positive-(semi)definite matrix. Note that for reasons due to finite precision arithmetic, finding the nearest positive-definite and nearest positive-semidefinite matrices are effectively equivalent tasks.
     #'
-    #' @return A logical value (\code{TRUE} or \code{FALSE})
+    #' @return If \code{isTRUE(make)}, a list with two components:
+    #' \describe{
+    #' \item{check}{A logical value indicating whether the matrix satisfies the test.}
+    #' \item{X.new}{The nearest matrix which satisfies the test (which may just be the input matrix itself.)}
+    #' }
+    #' Otherwise, only the logical value indicating whether the matrix satisfies the test is returned.
+    #'
     #' @export
     #'
     #' @examples
-    #' x <- cov(matrix(rnorm(100), nrow=10, ncol=10))
+    #' x    <- cov(matrix(rnorm(100), nrow=10, ncol=10))
     #' is.posi_def(x)
     #' is.posi_def(x, semi=TRUE)
-    is.posi_def <- function(x, tol = NULL,   semi = FALSE)  {
-      if(!is.matrix(x)   &&
-         nrow(x) != ncol(x))               stop("argument x is not a square matrix")
+    #'
+    #' Xnew <- is.posi_def(x, semi=FALSE, make=TRUE)$X.new
+    #' identical(x, Xnew)
+    #' identical(x, is.posi_def(x, semi=TRUE, make=TRUE)$X.new)
+    is.posi_def <- function(x, tol = NULL, semi = FALSE, make = FALSE)  {
+      if(!is.matrix(x)     &&
+        nrow(x) != ncol(x))                stop("argument x is not a square matrix")
       if(!is.symmetric(x))                 stop("argument x is not a symmetric matrix")
-      if(!is.numeric(x))                   stop("argument x is not a numeric matrix")
-      eigs      <- eigen(x,  only.values = TRUE,  symmetric = TRUE)$values
-      abseigs   <- abs(eigs)
-      tol       <- if(missing(tol)) max(abseigs)  * nrow(x) * .Machine$double.eps else tol
-      if(length(tol) > 1 ||
+      if(!is.double(x))                    stop("argument x is not a numeric matrix")
+      if(!is.logical(semi) ||
+         length(semi) > 1)                 stop("argument semi is not a single logical indicator")
+      if(!is.logical(make) ||
+         length(make) > 1)                 stop("argument make is not a single logical indicator")
+      d         <- nrow(x)
+      eigs      <- eigen(x, symmetric = TRUE)
+      eval      <- eigs$values
+      abseigs   <- abs(eval)
+      tol       <- if(missing(tol)) max(abseigs) * d * .Machine$double.eps else tol
+      if(length(tol)  > 1  ||
          !is.numeric(tol))                 stop("argument tol is not a single number")
-      test      <- replace(eigs, abseigs < tol, 0)
-        !any(if(isTRUE(semi)) test < 0 else test <= 0)
+      test      <- replace(eval, abseigs < tol, 0)
+      check     <- !any(if(isTRUE(semi)) test < 0 else test <= 0)
+      if(isTRUE(make))  {
+        evec    <- eigs$vectors
+        return(list(check = check, X.new = if(all(check)) x else x + evec %*% tcrossprod(diag(pmax(ifelse(isTRUE(semi), 0, .Machine$double.eps), 2 * tol - eval), d), evec)))
+      } else check
+    }
+
+  # Ledermann Bound
+#' Ledermann Bound
+#'
+#' Returns the maximum possible number of latent factors in a factor analysis model for data of dimension \code{P}. This Ledermann bound is given by the largest integer smaller than or equal to the solution \eqn{k}{k} of \eqn{(M - k)^2 \geq M + k}{(M - k)^2 >= M + k}.
+#' @param P Integer number of variables in data set.
+#'
+#' @return The Ledermann bound, a non-negative integer.
+#' @export
+#'
+#' @examples
+#' Ledermann(25)
+    Ledermann   <- function(P) {
+      P         <- as.integer(P)
+      if(length(P)   > 1  || P <= 0)       stop('argument P is a not a single positive integer')
+      R         <- P + 0.5 * (1 - sqrt(8 * P  + 1))
+        as.integer(floor(ifelse(1e-10 > abs(R - round(R)), round(R), R)))
+    }
+
+  # Procrustes Transformation
+#' Procrustes Transformation
+#'
+#' This function performs a Procrustes transformation on a matrix \code{X} to minimize the squared distance between \code{X} and another comparable matrix \code{Xstar}.
+#' @param X The matrix to be transformed.
+#' @param Xstar The target matrix.
+#' @param translate Logical value indicating whether \code{X} should be translated (defaults to \code{FALSE}).
+#' @param dilate Logical value indicating whether \code{X} should be dilated (defaults to \code{FALSE}).
+#' @param sumsq Logical value indicating whether the sum of squared differences between \code{X} and \code{Xstar} should be calculated and returned.
+#'
+#' @details{
+#'    \code{R}, \code{tt}, and \code{d} are chosen so that:
+#'
+#'    \deqn{d \times \mathbf{X} \mathbf{R} + 1\hspace*{-3pt}1 \underline{t}^\top \approx X^\star}{d X R + 1 t' approximately Xstar}
+#'
+#'    \code{X.new} is given by:
+#'
+#'    \deqn{X_{\textrm{new}} = d \times \mathbf{X} \mathbf{R} + 1\hspace*{-3pt}1 \underline{t}^\top}{X.new = d X R + 1 t'}
+#'}
+#'
+#' @return A list containing:
+#' \describe{
+#' \item{X.new}{The matrix that is the Procrustes transformed version of \code{X}.}
+#' \item{R}{The rotation matrix.}
+#' \item{t}{The translation vector (if \code{isTRUE(translate)}).}
+#' \item{d}{The scaling factor (is \code{isTRUE(dilate)}).}
+#' \item{ss}{The sum of squared differences (if \code{isTRUE(sumsq)}).}
+#' }
+#' @export
+#'
+#' @references Borg, I. and Groenen, P. J. F. (1997) \emph{Modern Multidimensional Scaling}. Springer-Verlag, New York, pp. 340-342.
+#'
+#' @examples
+#' # Match two matrices, allowing translation and dilation
+#' mat1     <- diag(rnorm(10))
+#' mat2     <- 0.05 * matrix(rnorm(100), 10, 10) + mat1
+#' proc     <- Procrustes(X=mat1, Xstar=mat2, translate=TRUE, dilate=TRUE, sumsq=TRUE)
+#'
+#' # Extract the transformed matrix, rotation matrix, translation vector and scaling factor
+#' mat_new  <- proc$X.new
+#' mat_rot  <- proc$R
+#' mat_t    <- proc$t
+#' mat_d    <- proc$d
+#'
+#' # Compare the sum of squared differences to a Procestean transformation with rotation only
+#' mat_ss   <- proc$ss
+#' mat_ss2  <- Procrustes(X=mat1, Xstar=mat2, sumsq=TRUE)$ss
+    Procrustes  <- function(X, Xstar, translate = FALSE, dilate = FALSE, sumsq = FALSE) {
+      if((N <- nrow(X)) != nrow(Xstar))    stop("X and Xstar do not have the same number of rows")
+      if((P <- ncol(X)) != ncol(Xstar))    stop("X and Xstar do not have the same number of columns")
+      J         <- if(translate) diag(N) - matrix(1/N, N, N)                         else diag(N)
+      C         <- crossprod(Xstar, J) %*% X
+      svdX      <- svd(C)
+      R         <- tcrossprod(svdX$v, svdX$u)
+      d         <- if(dilate)    sum(diag(C %*% R))/sum(diag(crossprod(X, J) %*% X)) else 1
+      tt        <- if(translate) crossprod(Xstar - d * X %*% R, matrix(1, N, 1))/N   else 0
+      X.new     <- d * X %*% R + if(translate) matrix(tt, N, P, byrow = TRUE)        else tt
+        return(c(list(X.new = X.new), list(R = R), if(translate) list(t = tt),
+                 if(dilate) list(d = d), if(sumsq) list(ss = sum((X - X.new)^2))))
     }
 
   # Length Checker
@@ -542,13 +694,16 @@
   # Moments of Dirichlet / Pitman-Yor Processes
 #' 1st Moment of the Dirichlet / Pitman-Yor processes
 #'
-#' Calculates the expected number of clusters under a Dirichlet process or Pitman-Yor process prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}, All arguments are vectorised. Requires use of the \code{Rmpfr} and \code{gmp} libraries for non-zero \code{discount} values.
+#' Calculates the expected number of clusters under a Dirichlet process or Pitman-Yor process prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}, All arguments are vectorised.
 #' @param N The sample size.
 #' @param alpha The concentration parameter. Must be specified and must be strictly greater than \code{-discount}.
 #' @param discount The discount parameter for the Pitman-Yor process. Must lie in the interval [0, 1). Defaults to 0 (i.e. the Dirichlet process).
 #'
 #' @return The expected number of clusters under the specified prior conditions.
 #' @export
+#'
+#' @note Requires use of the \code{Rmpfr} and \code{gmp} libraries for non-zero \code{discount} values.
+#'
 #' @seealso \code{\link{G_variance}}, \code{\link{G_priorDensity}}, \code{\link[Rmpfr]{Rmpfr}}
 #'
 #' @author Keefe Murphy
@@ -585,10 +740,12 @@
 
 #' 2nd Moment of Dirichlet / Pitman-Yor processes
 #'
-#' Calculates the variance in the number of clusters under a Dirichlet process or Pitman-Yor process prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}, All arguments are vectorised. Requires use of the \code{Rmpfr} and \code{gmp} libraries for non-zero \code{discount} values.
+#' Calculates the variance in the number of clusters under a Dirichlet process or Pitman-Yor process prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors for \code{alpha} or suitable fixed values for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}, All arguments are vectorised.
 #' @inheritParams G_expected
 #' @return The variance of the number of clusters under the specified prior conditions.
 #' @export
+#'
+#' @note Requires use of the \code{Rmpfr} and \code{gmp} libraries for non-zero \code{discount} values.
 #' @seealso \code{\link{G_expected}}, \code{\link{G_priorDensity}}, \code{\link[Rmpfr]{Rmpfr}}
 #'
 #' @author Keefe Murphy
@@ -719,16 +876,24 @@
     }
 
   # Other Hidden Functions
-    .chol       <- function(x) tryCatch(chol(x), error=function(e) chol(.make_posdef(x)))
+    .chol       <- function(x) tryCatch(chol(x), error=function(e) {
+      d         <- nrow(x)
+      eigs      <- eigen(x, symmetric = TRUE)
+      eval      <- eigs$values
+      evec      <- eigs$vectors
+        return(chol(x + evec %*% tcrossprod(diag(pmax(0, 2 * max(abs(eval)) * d * .Machine$double.eps - eval), d), evec)))
+      }
+    )
 
     .detach_pkg <- function(pkg, character.only = FALSE) {
-      if(!character.only) {
-        pkg     <- deparse(substitute(pkg))
-      }
-      searches  <- paste("package", pkg, sep=":")
+      searches  <- paste("package", if(!character.only) deparse(substitute(pkg)) else pkg, sep=":")
       while(searches %in% search()) {
         detach(searches, unload=TRUE, character.only=TRUE)
       }
+    }
+
+    .empty_mat <- function(nr) {
+      base::matrix(0L, nrow=nr, ncol=0)
     }
 
     .ent_exit  <- function(opts = options()) {
@@ -738,66 +903,23 @@
         if(ent  %in% c("exit", "EXIT"))    stop()
     }
 
-    .ledermann  <- function(N, P) {
-      R         <- P + 0.5 - (0.5  * sqrt(8 * P + 1))
-        as.integer(floor(min(N - 1, ifelse(1e-10 > abs(R - round(R)), round(R), R))))
+    .logdensity     <- function(x,  left = 0) { # export?
+      d        <- tryCatch(density(x, bw = "SJ"),  error  = function(e) density(x))
+      h        <- d$bw
+      w        <- 1/pnorm(left,  mean = x, sd = h, lower.tail = FALSE)
+        return(suppressWarnings(density(x, bw = h, kernel = "gaussian", weights = w/length(x))))
     }
 
-    .logitdensity   <- function(x)  {
-      y         <- qlogis(x)
-      g         <- density(y, bw    = "SJ")
+    .logitdensity   <- function(x)  { # export?
+      y         <- qlogis(x[x  > 0  &   x < 1])
+      g         <- tryCatch(density(y, bw = "SJ"), error  = function(e) density(y))
       xgrid     <- plogis(g$x)
       g$y       <- g$y/(xgrid  * (1 - xgrid))
       g$x       <- xgrid
         return(g)
     }
 
-   .make_posdef <- function(x, tol = NULL) {
-      if(!is.matrix(x)   &&
-        nrow(x) != ncol(x))                stop("argument x is not a square matrix")
-      if(!is.symmetric(x))                 stop("argument x is not a symmetric matrix")
-      if(!is.numeric(x))                   stop("argument x is not a numeric matrix")
-      d         <- nrow(x)
-      eigs      <- eigen(x, symmetric = TRUE)
-      eval      <- eigs$values
-      evec      <- eigs$vectors
-      tol       <- if(missing(tol)) max(abs(eval)) * d * .Machine$double.eps else tol
-        return(x + evec %*% tcrossprod(diag(pmax(0,  2 * tol - eval), d), evec))
-    }
-
-    .moore_inv  <- function(X, tol = sqrt(.Machine$double.eps)) {
-      if(length(dim(X)) > 2L ||
-         !(is.numeric(X)     ||
-           is.complex(X)))                 stop("'X' must be a numeric or complex matrix")
-      if(!is.matrix(X))    X <- as.matrix(X)
-      Xs        <- svd(X)
-      if(is.complex(X)) Xs$u <- Conj(Xs$u)
-      Posi      <- Xs$d > max(tol * Xs$d[1L], 0)
-      if(all(Posi))     {
-          Xs$v %*% (t(Xs$u)/Xs$d)
-      } else if(!any(Posi))   {
-          array(0, dim(X)[2L:1L])
-      } else {
-          Xs$v[,Posi,drop=FALSE] %*% (t(Xs$u[,Posi,drop=FALSE])/Xs$d[Posi])
-      }
-    }
-
     .power2     <- function(x) x * x
-
-    .Procrustes <- function(X, Xstar, translate = FALSE, dilate = FALSE) {
-      n         <- nrow(X)
-      p         <- ncol(X)
-      if(n      != nrow(Xstar))            stop("X and Xstar do not have the same number of rows")
-      if(p      != ncol(Xstar))            stop("X and Xstar do not have the same number of columns")
-      J         <- if(translate) diag(n) - matrix(1/n, n, n)                         else diag(n)
-      C         <- crossprod(Xstar, J) %*% X
-      svdX      <- svd(C)
-      R         <- tcrossprod(svdX$v, svdX$u)
-      s         <- if(dilate)    sum(diag(C %*% R))/sum(diag(crossprod(X, J) %*% X)) else 1
-      tt        <- if(translate) crossprod(Xstar - s * X %*% R, matrix(1, n, 1))/n   else 0
-      Xnew      <- s * X %*% R + if(translate) matrix(tt, n, p, byrow = TRUE)        else tt
-        return(c(list(X.new = Xnew), list(R = R), if(translate) list(tt = tt), if(dilate) list(s = s)))
-    }
 
     .which0     <- function(x) which(x == 0)
     #
