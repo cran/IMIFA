@@ -1,7 +1,7 @@
-518280fc5fdedb5c6f448a0d18b152b3 *DESCRIPTION
+ee1488ada3cd3d862e25c1eafb81d75c *DESCRIPTION
 0047fac4b5c2453d9b0afd9ee250b973 *NAMESPACE
-80a41879a45e16dfd227d30a4079311b *NEWS.md
-fbd82d61f472e4a76c051f9c50175ef4 *R/Diagnostics.R
+145036d6e71ee898aabb26f9d8c451bd *NEWS.md
+6fde21503d0335603c25d2eef2daada0 *R/Diagnostics.R
 4b89229356df76717f2ff700f15dbf68 *R/FullConditionals.R
 63376a72809ceb0baa3990d44a8edafd *R/Gibbs_FA.R
 c1fc1959cf8c67d4e796d8bfd2f1cb33 *R/Gibbs_IFA.R
@@ -11,9 +11,9 @@ e0b97b062fa6fe05f72bd3eeab63b89c *R/Gibbs_IMFA.R
 adff3bb80797bcd86416a54c45bda19a *R/Gibbs_MIFA.R
 dabfc9c8ff6cac826b5ecea8463412f4 *R/Gibbs_OMFA.R
 4ffa37dedbdc7b82b213b405025fa66a *R/Gibbs_OMIFA.R
-f677e31c954826a66d464e59ad58ddfb *R/IMIFA.R
-c757631ab7576b8c6d25b2435a61ba87 *R/MainFunction.R
-d79824fa029795fc325c8f368ed6b5ec *R/PlottingFunctions.R
+4b75d19048bd6f08665d253a61d7e953 *R/IMIFA.R
+cd63b79c028405a6cbbaa99a8f0a27b6 *R/MainFunction.R
+0840af5943228cb65d974b8ee6c40d1c *R/PlottingFunctions.R
 5070d58144279fe7ed1d188382a77188 *R/SimulateData.R
 4e1464abd196123142e032a066f9628c *R/data.R
 67451aae22ea6399aa7705ac5d0432c1 *README.md
@@ -22,11 +22,11 @@ d79824fa029795fc325c8f368ed6b5ec *R/PlottingFunctions.R
 34fbecb96149bd96a12e9bdd0dc94f98 *data/olive.rda
 906fec5f08c1de15c0dca6ab045a32e1 *inst/doc/IMIFA.R
 9089df39fde860c767672118c90cfe91 *inst/doc/IMIFA.Rmd
-3a28c75df6f3e19cee280b9ca26bf100 *inst/doc/IMIFA.html
+c16bc48301c584d9bdd31c11cc1e991d *inst/doc/IMIFA.html
 67cfaf32d098bf18936c64e60c05e844 *man/G_expected.Rd
 a0cb77dec5c8c94d2df661fb6d928c69 *man/G_priorDensity.Rd
 67d1aea332b1ce55492ac0eb4cf95ee7 *man/G_variance.Rd
-a47919032b7c9433bf6fc7973d9e76c4 *man/IMIFA.Rd
+411789593128d0e86def24503f64b4c8 *man/IMIFA.Rd
 38a51bb77be43b62466cfda64336dee0 *man/Ledermann.Rd
 ea98d66316220f2c2c956f9cd24fd632 *man/MGP_check.Rd
 8adb98e4697504a5937f19451d08419f *man/PGMM_dfree.Rd
@@ -48,4 +48,4 @@ bfe7d96a2294c66843ca30f9071b97e6 *man/psi_hyper.Rd
 91df66c816df4c382a428180b77c49a2 *man/shift_GA.Rd
 2b9ea02f5604e35850975e387a8eefa0 *man/sim_IMIFA_data.Rd
 9089df39fde860c767672118c90cfe91 *vignettes/IMIFA.Rmd
-c52793291f0e0f057c961e4b45f446f2 *vignettes/res_olive_IMIFA__Edited-Vignette-only-Version.rda
+55a0ace980aa1f80afcf8017a2557605 *vignettes/res_olive_IMIFA__Edited-Vignette-only-Version.rda
