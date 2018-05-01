@@ -2,41 +2,48 @@
 % Please edit documentation in R/SimulateData.R
 \name{sim_IMIFA_data}
 \alias{sim_IMIFA_data}
-\title{Simulating Data from a Mixture of Factor Analysers Structure}
+\title{Simulate Data from a Mixture of Factor Analysers Structure}
 \usage{
-sim_IMIFA_data(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
-  pis = rep(1/G, G), psi = NULL, nn = NULL, loc.diff = 1L,
-  method = c("conditional", "marginal"))
+sim_IMIFA_data(N = 300L,
+               G = 3L,
+               P = 50L,
+               Q = rep(floor(log(P)), G),
+               pis = rep(1/G, G),
+               mu = NULL,
+               psi = NULL,
+               nn = NULL,
+               loc.diff = 1L,
+               method = c("conditional", "marginal"))
 }
 \arguments{
-\item{N}{Desired overall number of observations in the simulated data set - a single integer.}
+\item{N, G, P}{Desired overall number of observations, number of clusters, and number of variables in the simulated data set. All must be a single integer.}
 
-\item{G}{Desired number of clusters in the simulated data set - a single integer.}
-
-\item{P}{Desired number of variables in the simulated dataset - a single integer.}
-
-\item{Q}{Desired number of cluster-specific latent factors in the simulated data set. Can be specified either as a single integer if all clusters are to have the same number of factors, or a vector of length \code{G}. Defaults to \code{floor(log(P))} in each group.}
+\item{Q}{Desired number of cluster-specific latent factors in the simulated data set. Can be specified either as a single integer if all clusters are to have the same number of factors, or a vector of length \code{G}. Defaults to \code{floor(log(P))} in each cluster.}
 
 \item{pis}{Mixing proportions of the clusters in the dataset if \code{G} > 1. Must sum to 1. Defaults to \code{rep(1/G, G)}.}
 
-\item{psi}{True values of uniqueness parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix: as such the user can specify uniquenesses as a diagonal or isotropic matrix, and further constrain uniquenesses across groups if desired. If \code{psi} is missing, uniquenesses are simulated via \code{rgamma(P, 1, 1)} within each group.}
+\item{mu}{True values of the mean parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. If \code{mu} is missing, \code{loc.diff} is invoked to simulate distinct means for each cluster.}
 
-\item{nn}{An alternative way to specify the size of each cluster, by giving the exact number of observations in each group explicitly. Must sum to \code{N}.}
+\item{psi}{True values of uniqueness parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. As such the user can specify uniquenesses as a diagonal or isotropic matrix, and further constrain uniquenesses across clusters if desired. If \code{psi} is missing, uniquenesses are simulated via \code{rgamma(P, 1, 1)} within each cluster.}
 
-\item{loc.diff}{A parameter to control the closeness of the clusters in terms of the difference in their location vectors. Defaults to 1.}
+\item{nn}{An alternative way to specify the size of each cluster, by giving the exact number of observations in each cluster explicitly. Must sum to \code{N}.}
+
+\item{loc.diff}{A parameter to control the closeness of the clusters in terms of the difference in their location vectors. Only relevant if \code{mu} is NOT supplied. Defaults to 1.}
 
 \item{method}{A switch indicating whether the mixture to be simulated from is the conditional distribution of the data given the latent variables (default), or simply the marginal distribution of the data.}
 }
 \value{
-Invisibly returns a data.frame with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored.
+Invisibly returns a \code{data.frame} with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored as attributes.
 }
 \description{
 Function to simulate data of any size and dimension from a mixture of (infinite) factor analysers structure.
 }
 \examples{
-# Simulate 100 observations from 3 balanced groups with cluster-specific numbers of latent factors
+# Simulate 100 observations from 3 balanced clusters with cluster-specific numbers of latent factors
 # Specify isotropic uniquenesses within each cluster
-sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5), psi=1:3)
+# Supply cluster means directly
+sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5), psi=1:3,
+                           mu=matrix(rnorm(60, -2 + 1:3, 1), nrow=20, ncol=3, byrow=TRUE))
 names(attributes(sim_data))
 labels   <- attr(sim_data, "Labels")
 
@@ -44,11 +51,15 @@ labels   <- attr(sim_data, "Labels")
 plot(cmdscale(dist(sim_data), k=2), col=labels)
 
 # Fit a MIFA model to this data
-# tmp      <- mcmc_IMIFA(sim_data, method="MIFA", range.G=3, n.iters=5000)
+# tmp    <- mcmc_IMIFA(sim_data, method="MIFA", range.G=3, n.iters=5000)
+}
+\references{
+Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
 }
 \seealso{
-The function \code{\link{mcmc_IMIFA}} for fitting an IMIFA related model to the simulated data set.
+\code{\link{mcmc_IMIFA}} for fitting an IMIFA related model to the simulated data set.
 }
 \author{
-Keefe Murphy
+Keefe Murphy - <\email{keefe.murphy@ucd.ie}>
 }
+\keyword{utility}

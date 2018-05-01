@@ -1,6 +1,6 @@
 ## ----setup, include=FALSE------------------------------------------------
 knitr::opts_chunk$set(fig.width=7, fig.height = 5, fig.align = 'center', fig.show='hold',
-                      warning=FALSE, message=FALSE, progress=FALSE)
+                      warning=FALSE, message=FALSE, progress=FALSE, collapse=TRUE, comments="#>")
 
 ## ---- eval=FALSE---------------------------------------------------------
 #  install.packages('devtools')
@@ -13,8 +13,10 @@ knitr::opts_chunk$set(fig.width=7, fig.height = 5, fig.align = 'center', fig.sho
 library(IMIFA)
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  # Simulate 100 observations from 3 balanced groups with group-specific numbers of latent factors
-#  sim.data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5))
+#  # Simulate 100 observations from 3 balanced clusters with cluster-specific numbers of latent factors
+#  sim_data <- sim_IMIFA_data(N=100, G=3, P=20, Q=c(2, 2, 5),
+#                             psi=matrix(rgamma(60, 2, 1), nrow=20, ncol=3),
+#                             mu=matrix(rnorm(60, -2 + 1:3, 1), nrow=20, ncol=3, byrow=TRUE))
 
 ## ------------------------------------------------------------------------
 data(olive)
@@ -26,19 +28,19 @@ data(olive)
 #  ?mcmc_IMIFA
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  simMFA   <- mcmc_IMIFA(olive, method="MFA", n.iters=10000, range.G=3:6, range.Q=0:3,
-#                         centering=FALSE, scaling="unit", uni.type="isotropic")
+#  simMFA   <- mcmc_IMIFA(olive, method="MFA", n.iters=10000, range.G=3:6, range.Q=0:3, centering=FALSE,
+#                         scaling="unit", uni.type="isotropic", score.switch=FALSE)
 
 ## ---- eval=FALSE---------------------------------------------------------
 #  simMIFA  <- mcmc_IMIFA(olive, method="MIFA", n.iters=10000, centering=TRUE,
 #                         range.G=1:3, z.init="kmeans")
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  simOMIFA <- mcmc_IMIFA(olive, method="OMIFA", n.iters=10000, range.G=10, nu=3, alpha=0.8,
-#                         alpha.d1=3.5, alpha.d2=7, prop=0.6, epsilon=0.12)
+#  simOMIFA <- mcmc_IMIFA(olive, method="OMIFA", n.iters=10000, range.G=10, alpha=0.8,
+#                         alpha.d1=3.5, nu=3, alpha.d2=7, prop=0.6, epsilon=0.12)
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE, s.sw=FALSE, learn.d=TRUE)
+#  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE, learn.d=TRUE)
 
 ## ---- eval=FALSE---------------------------------------------------------
 #  resMFA  <- get_IMIFA_results(simMFA)
@@ -70,8 +72,14 @@ plot(resIMIFA, plot.meth="GQ", g=3)
 ## ------------------------------------------------------------------------
 plot(resIMIFA, plot.meth="zlabels", zlabels=olive$area, g=1)
 
+## ---- results="hide"-----------------------------------------------------
+plot(resIMIFA, plot.meth="zlabels", zlabels=olive$area, g=2)
+
+## ---- results="hide"-----------------------------------------------------
+plot(resIMIFA, plot.meth="zlabels", g=4)
+
 ## ------------------------------------------------------------------------
-plot(resIMIFA, plot.meth="zlabels", g=3)
+plot(resIMIFA, plot.meth="zlabels", g=5)
 
 ## ------------------------------------------------------------------------
 plot(resIMIFA, plot.meth="means", param="means", mat=TRUE, g=1)

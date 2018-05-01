@@ -4,9 +4,17 @@
 \alias{plot_cols}
 \title{Plots a matrix of colours}
 \usage{
-plot_cols(cmat, na.col = "#808080FF", ptype = c("image", "points"),
-  border.col = "#808080FF", dlabels = NULL, rlabels = FALSE,
-  clabels = FALSE, pch = 15, cex = 3, label.cex = 0.6, ...)
+plot_cols(cmat,
+          na.col = "#808080FF",
+          ptype = c("image", "points"),
+          border.col = "#808080FF",
+          dlabels = NULL,
+          rlabels = FALSE,
+          clabels = FALSE,
+          pch = 15,
+          cex = 3,
+          label.cex = 0.6,
+          ...)
 }
 \arguments{
 \item{cmat}{A matrix of valid colours, with missing values coded as \code{NA} allowed. Vectors should be supplied as matrices with 1 row or column, as appropriate.}
@@ -17,11 +25,7 @@ plot_cols(cmat, na.col = "#808080FF", ptype = c("image", "points"),
 
 \item{border.col}{Colour of border drawn around the plot.}
 
-\item{dlabels}{Vector of labels for the diagonals.}
-
-\item{rlabels}{Vector of labels for the rows.}
-
-\item{clabels}{Vector of labels for the columns.}
+\item{dlabels, rlabels, clabels}{Vector of labels for the diagonals, rows, and columns, respectively.}
 
 \item{pch}{Point type used when \code{ptype="points"}.}
 
@@ -32,7 +36,7 @@ plot_cols(cmat, na.col = "#808080FF", ptype = c("image", "points"),
 \item{...}{Further graphical parameters.}
 }
 \value{
-Either an \code{"image"} or \code{"points"} plot of the supplied colours.
+Either an \code{"image"} or \code{"points"} type plot of the supplied colours.
 }
 \description{
 Plots a matrix of colours as a heat map type image or as points. Intended for joint use with \code{mat2cols}.
@@ -42,8 +46,7 @@ Plots a matrix of colours as a heat map type image or as points. Intended for jo
 mat      <- matrix(rnorm(100), nrow=10, ncol=10)
 mat[2,3] <- NA
 cols     <- heat.colors(12)[12:1]
-matcol   <- mat2cols(mat, cols=cols)
-matcol
+(matcol  <- mat2cols(mat, cols=cols))
 
 # Use plot_cols() to visualise the colours matrix
 par(mar=c(5.1, 4.1, 4.1, 4.1))
@@ -55,3 +58,4 @@ heat_legend(mat, cols=cols); box(lwd=2)
 \seealso{
 \code{\link{mat2cols}}, \code{\link[graphics]{image}}, \code{\link{heat_legend}}, \code{\link{is.cols}}
 }
+\keyword{plotting}

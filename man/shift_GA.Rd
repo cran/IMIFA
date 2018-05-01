@@ -4,12 +4,13 @@
 \alias{shift_GA}
 \title{Moment Matching Parameters of Shifted Gamma Distributions}
 \usage{
-shift_GA(shape, rate, shift = 0L, param = c("rate", "scale"))
+shift_GA(shape,
+         rate,
+         shift = 0L,
+         param = c("rate", "scale"))
 }
 \arguments{
-\item{shape}{Shape parameter a of a Gamma(a, b) distribution. Must be strictly positive.}
-
-\item{rate}{Rate parameter b of a Gamma(a, b) distribution. Must be strictly positive.}
+\item{shape, rate}{Shape and rate parameters a and b, respectibely, of a Gamma(a, b) distribution. Both must be strictly positive.}
 
 \item{shift}{Modifier, such that the Gamma distribution has support on (\code{shift}, \eqn{\infty}). Can be positive or negative, though typically negative and small.}
 
@@ -27,5 +28,6 @@ This function takes shape and rate parameters of a Gamma distribution and modifi
 shift_GA(4, 2, -1)
 }
 \author{
-Keefe Murphy
+Keefe Murphy - <\email{keefe.murphy@ucd.ie}>
 }
+\keyword{utility}

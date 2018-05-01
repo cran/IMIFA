@@ -4,12 +4,17 @@
 \alias{is.posi_def}
 \title{Check Postive-(Semi)definiteness of a matrix}
 \usage{
-is.posi_def(x, tol = NULL, semi = FALSE, make = FALSE)
+is.posi_def(x,
+            tol = NULL,
+            semi = FALSE,
+            make = FALSE)
 }
 \arguments{
 \item{x}{A matrix, assumed to be real and symmetric.}
 
-\item{tol}{Tolerance for singular values and for absolute eigenvalues - only those with values larger than tol are considered non-zero (default: tol = \code{max(dim(x))*max(E)*.Machine$double.eps}, where \code{E} is the vector of absolute eigenvalues).}
+\item{tol}{Tolerance for singular values and for absolute eigenvalues - only those with values larger than tol are considered non-zero.
+
+(default: tol = \code{max(dim(x))*max(E)*.Machine$double.eps}, where \code{E} is the vector of absolute eigenvalues).}
 
 \item{semi}{Logical switch to test for positive-semidefiniteness when \code{TRUE} or positive-definiteness when \code{FALSE} (the default).}
 
@@ -17,10 +22,8 @@ is.posi_def(x, tol = NULL, semi = FALSE, make = FALSE)
 }
 \value{
 If \code{isTRUE(make)}, a list with two components:
-\describe{
-\item{check}{A logical value indicating whether the matrix satisfies the test.}
-\item{X.new}{The nearest matrix which satisfies the test (which may just be the input matrix itself.)}
-}
+\item{\code{check}}{A logical value indicating whether the matrix satisfies the test.}
+\item{\code{X.new}}{The nearest matrix which satisfies the test (which may just be the input matrix itself.)}
 Otherwise, only the logical value indicating whether the matrix satisfies the test is returned.
 }
 \description{
@@ -35,3 +38,4 @@ Xnew <- is.posi_def(x, semi=FALSE, make=TRUE)$X.new
 identical(x, Xnew)
 identical(x, is.posi_def(x, semi=TRUE, make=TRUE)$X.new)
 }
+\keyword{utility}

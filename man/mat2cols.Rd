@@ -4,13 +4,18 @@
 \alias{mat2cols}
 \title{Convert a numeric matrix to colours}
 \usage{
-mat2cols(mat, cols = NULL, compare = FALSE, byrank = FALSE,
-  breaks = length(cols), na.col = "#808080FF")
+mat2cols(mat,
+         cols = NULL,
+         compare = FALSE,
+         byrank = FALSE,
+         breaks = NULL,
+         na.col = "#808080FF",
+         transparency = 1)
 }
 \arguments{
 \item{mat}{Either a matrix or, when \code{compare} is \code{TRUE}, a list of matrices.}
 
-\item{cols}{The colour palette to be used. The default palette uses \code{\link[viridis]{viridis}}. Will be checked for validity.}
+\item{cols}{The colour palette to be used. The default palette uses \code{\link[viridisLite]{viridis}}. Will be checked for validity by \code{\link{is.cols}}.}
 
 \item{compare}{Logical switch used when desiring comparable colour representations (usually for comparable heat maps) across multiple matrices. Ensures plots will be calibrated to a common colour scale so that, for instance, the colour on the heat map of an entry valued at 0.7 in Matrix A corresponds exactly to the colour of a similar value in Matrix B. When \code{TRUE}, \code{mat} must be supplied as a list of matrices, which must have either the same number of rows, or the same number of columns.}
 
@@ -18,7 +23,9 @@ mat2cols(mat, cols = NULL, compare = FALSE, byrank = FALSE,
 
 \item{breaks}{Number of gradations in colour to use. Defaults to \code{length(cols)}.}
 
-\item{na.col}{Colour to be used to represent missing data.}
+\item{na.col}{Colour to be used to represent missing data. Will be checked for validity by \code{\link{is.cols}}.}
+
+\item{transparency}{A factor in [0, 1] modifying the opacity for overplotted lines. Defaults to 1 (i.e. no transparency). Only relevant when \code{cols} is not supplied, otherwise the supplied \code{cols} must already be adjusted for transparency.}
 }
 \value{
 A matrix of hex colour code representations, or a list of such matrices when \code{compare} is \code{TRUE}.
@@ -31,8 +38,7 @@ Converts a matrix to a hex colour code representation for plotting using \code{\
 mat      <- matrix(rnorm(100), nrow=10, ncol=10)
 mat[2,3] <- NA
 cols     <- heat.colors(12)[12:1]
-matcol   <- mat2cols(mat, cols=cols)
-matcol
+(matcol  <- mat2cols(mat, cols=cols))
 
 # Use plot_cols() to visualise the colours matrix
 par(mar=c(5.1, 4.1, 4.1, 4.1))
@@ -62,3 +68,4 @@ plot_cols(mat2cols(mat3, cols=cols)); heat_legend(range(mats), cols=cols); box(l
 \seealso{
 \code{\link{plot_cols}}, \code{\link{heat_legend}}, \code{\link{is.cols}}
 }
+\keyword{plotting}

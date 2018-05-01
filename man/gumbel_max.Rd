@@ -4,10 +4,11 @@
 \alias{gumbel_max}
 \title{Simulate Cluster Labels from Unnormalised Log-Probabilities using the Gumbel-Max Trick}
 \usage{
-gumbel_max(probs, slice = FALSE)
+gumbel_max(probs,
+           slice = FALSE)
 }
 \arguments{
-\item{probs}{An N x G matrix of unnormalised probabilities on the log scale, where N is he number of observations that require labels to be sampled and G is the number of active clusters s.t. sampled labels can take values in \code{1:G}.}
+\item{probs}{An N x G matrix of unnormalised probabilities on the log scale, where N is he number of observations that require labels to be sampled and G is the number of active clusters s.t. sampled labels can take values in \code{1:G}. Typically \code{N > G}.}
 
 \item{slice}{A logical indicating whether or not the indicator correction for slice sampling has been applied to \code{probs}. Defaults to \code{FALSE} but is \code{TRUE} for the "\code{IMIFA}" and "\code{IMFA}" methods under \code{\link{mcmc_IMIFA}}. Details of this correction are given in Murphy et. al. (2017). When set to \code{TRUE}, this results in a speed-improvement when \code{probs} contains non-finite values (e.g. \code{-Inf}, corresponding to zero on the probability scale).}
 }
@@ -15,16 +16,20 @@ gumbel_max(probs, slice = FALSE)
 A vector of N sampled cluster labels, with the largest label no greater than G.
 }
 \description{
-Samples cluster labels for N observations from G groups efficiently using log-probabilities and the so-called Gumbel-Max trick, without requiring that the log-probabilities be normalised; thus redunant computation can be avoided. Computation takes place on the log scale for stability/underflow reasons (to ensure negligible probabilities won't cause computational difficulties); in any case, many functions for calculating multivariate normal densities already output on the log scale.
+Samples cluster labels for N observations from G clusters efficiently using log-probabilities and the so-called Gumbel-Max trick, without requiring that the log-probabilities be normalised; thus redunant computation can be avoided.
+}
+\details{
+Computation takes place on the log scale for stability/underflow reasons (to ensure negligible probabilities won't cause computational difficulties); in any case, many functions for calculating multivariate normal densities already output on the log scale.
 }
 \note{
-Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.\cr
+Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.
+
 If the normalising constant is required for another reason, e.g. to compute the log-likelihood, it can be calculated by summing the output obtained by calling \code{\link[matrixStats]{rowLogSumExps}} on \code{probs}.
 }
 \examples{
-# Create a 1-row matrix of weights
+# Create weights for 3 components
   G         <- 3
-  weights   <- matrix(c(1, 2, 3), nrow=1, ncol=G)
+  weights   <- seq_len(G)
 
 # Call gumbel_max() repeatedly to obtain samples of the labels, zs
   iters     <- 10000
@@ -33,17 +38,17 @@ If the normalising constant is required for another reason, e.g. to compute the 
 
 # Compare answer to the normalised weights
   tabulate(zs, nbins=G)/iters
-  normalised <- as.numeric(weights/sum(weights))
+  (normalised <- as.numeric(weights/sum(weights)))
 
 # Simulate a matrix of dirichlet weights & the associated vector of N labels
   N       <- 400
   G       <- 8
   sizes   <- seq(from=85, to=15, by=-10)
   weights <- matrix(rDirichlet(N * G, alpha=1, nn=sizes), byrow=TRUE, nrow=N, ncol=G)
-  zs      <- gumbel_max(probs=log(weights))
+  (zs     <- gumbel_max(probs=log(weights)))
 }
 \references{
-Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \href{https://arxiv.org/abs/1701.07010}{arXiv:1701.07010}.
+Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
 
 Yellot, J. I. Jr. (1977) The relationship between Luce's choice axiom, Thurstone's theory of comparative judgment, and the double exponential distribution, \emph{Journal of Mathematical Psychology}, 15: 109-144.
 }
@@ -51,5 +56,6 @@ Yellot, J. I. Jr. (1977) The relationship between Luce's choice axiom, Thurstone
 \code{\link{mcmc_IMIFA}}, \code{\link[matrixStats]{rowLogSumExps}}
 }
 \author{
-Keefe Murphy
+Keefe Murphy - <\email{keefe.murphy@ucd.ie}>
 }
+\keyword{utility}

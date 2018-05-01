@@ -4,32 +4,43 @@
 \alias{psi_hyper}
 \title{Find sensible inverse gamma hyperparameters for variance/uniqueness parameters}
 \usage{
-psi_hyper(shape, covar, type = c("unconstrained", "isotropic"))
+psi_hyper(shape,
+          covar,
+          type = c("unconstrained", "isotropic"))
 }
 \arguments{
 \item{shape}{A positive shape hyperparameter.}
 
-\item{covar}{A square, positive-semidefinite covariance matrix.}
+\item{covar}{A square, positive-semidefinite covariance matrix. If manually supplying the rate(s) to \code{\link{mcmc_IMIFA}} be careful to ensure that data are scaled in the same way when supplying \code{covar} here.}
 
-\item{type}{A switch indicating whether a single rate (\code{isotropic}) or variable-specific rates (\code{unconstrained}) are to be derived. The isotropic constraint provides the link between factor analysis and the probabilistic principal components analysis model. Uniquenesses are only allowed to be variable specific under the factor analysis model.}
+\item{type}{A switch indicating whether a single rate (\code{isotropic}) or variable-specific rates (\code{unconstrained}) are to be derived. Both options are allowed under models in \code{\link{mcmc_IMIFA}} with "constrained" or "unconstrained" uniquenesses, but only a single rate can be specified for models with "isotropic" or "single" uniquenesses.}
 }
 \value{
-Either a single rate hyperparameter or \code{ncol(covar)} variable specific hyperparameters.
+Either a single rate hyperparameter or \code{ncol(covar)} variable-specific rate hyperparameters.
 }
 \description{
-Takes a shape hyperparameter and covariance matrix, and finds data-driven rate hyperparameters in such a way that Heywood problems are avoided for factor analysis or probabilistic principal components analysis (and mixtures thereof). Rates are allowed to be variable-specific or a single value under the factor analysis model, but must be a single value for the PPCA model. Used internally by \code{\link{mcmc_IMIFA}} when its argument \code{psi_beta} is not supplied.
+Takes an inverse-Gamma shape hyperparameter, and a covariance matrix, and finds data-driven rate hyperparameters in such a way that Heywood problems are avoided for factor analysis or probabilistic principal components analysis (and mixtures thereof).
+}
+\details{
+Constraining uniquenesses to be isotropic provides the link between factor analysis and the probabilistic PCA model. When used in conjunction with \code{\link{mcmc_IMIFA}} with "isotropic" or "single" uniquenesses, \code{type} must be \code{isotropic}, but for "unconstrained" or "constrained" uniquenesses, it's possible to specify either a single rate (\code{type="isotropic"}) or variable-specific rates (\code{type="unconstrained"}).
+
+Used internally by \code{\link{mcmc_IMIFA}} when its argument \code{psi_beta} is not supplied.
 }
 \examples{
 data(olive)
 olive2 <- olive[,-(1:2)]
-rates  <- psi_hyper(shape=2.5, covar=cov(olive2), type="isotropic")
-rates
+(rate  <- psi_hyper(shape=2.5, covar=cov(olive2), type="isotropic"))
 
 olive_scaled <- scale(olive2, center=TRUE, scale=TRUE)
-rate   <- psi_hyper(shape=3, covar=cov(olive_scaled), type="unconstrained")
-rate
+(rates <- psi_hyper(shape=3, covar=cov(olive_scaled), type="unconstrained"))
+
+# In the scaled example, the mean uniquenesses (given by rates/(shape - 1)),
+# can be interpreted as the proportion of the variance that is idiosyncratic
+(prop  <- rates/(3 - 1) * 100)
 }
 \references{
+Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+
 Fruwirth-Schnatter, S. and Lopes, H. F. (2010). Parsimonious Bayesian factor analysis when the number of factors is unknown, \emph{Technical Report}. The University of Chicago Booth School of Business.
 
 Tipping, M. E. and Bishop, C. M. (1999). Probabilistic principal component analysis, \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}, 61(3): 611-622.
@@ -38,5 +49,6 @@ Tipping, M. E. and Bishop, C. M. (1999). Probabilistic principal component analy
 \code{\link{mcmc_IMIFA}}
 }
 \author{
-Keefe Murphy
+Keefe Murphy - <\email{keefe.murphy@ucd.ie}>
 }
+\keyword{utility}

@@ -2,26 +2,31 @@
 % Please edit documentation in R/FullConditionals.R
 \name{Zsimilarity}
 \alias{Zsimilarity}
-\title{Summarises MCMC clustering labels with a similarity matrix and finds the 'average' clustering}
+\title{Summarise MCMC samples of clustering labels with a similarity matrix and find the 'average' clustering}
 \usage{
 Zsimilarity(zs)
 }
 \arguments{
-\item{zs}{A matrix containing samples of clustering labels where the rows correspond to the number of observations and the columns correspond to the number of iterations.}
+\item{zs}{A matrix containing samples of clustering labels where the columns correspond to the number of observations (N) and the rows correspond to the number of iterations (M).}
 }
 \value{
 A list containing three elements:
-\describe{
 \item{z.avg}{The 'average' clustering, with minimum squared distance to \code{z.sim}.}
-\item{z.sim}{The N x N similary matrix, in a sparse format (see \code{\link[slam]{as.simple_triplet_matrix}}). If the data have been previously ordered, a (ordered) heatmap may provide a useful visualisation. The user is also invited to perform hierarchical clustering using \code{\link[stats]{hclust}} after first converting this similarity matrix to a distance matrix - "complete" linkage is recommended.}
-\item{dist.z}{A vector of length N recording the distances between each clustering and the 'average' clustering.}
-}
+\item{z.sim}{The N x N similary matrix, in a sparse format (see \code{\link[slam]{simple_triplet_matrix}}).}
+\item{MSE.z}{A vector of length M recording the MSEs between each clustering and the 'average' clustering.}
 }
 \description{
-This functions takes a Monte Carlo sample of cluster labels, converts them to adjacency matrices, and computes a similarity matrix as an average of the adjacency matrices. The dimension of the similarity matrix is invariant to label switching and the number of clusters in each sample. As a summary of the posterior clustering, the index of the clustering with minimum squared distance to this 'average' clustering is reported.
+This function takes a Monte Carlo sample of cluster labels, computes an average similarity matrix and returns the clustering with minimum mean squared error to this average. The \code{mcclust} package \strong{must} be loaded.
+}
+\details{
+This function takes a Monte Carlo sample of cluster labels, converts them to adjacency matrices, and computes a similarity matrix as an average of the adjacency matrices. The dimension of the similarity matrix is invariant to label switching and the number of clusters in each sample, desirable features when summarising partitions of Bayesian nonparametric models such as IMIFA. As a summary of the posterior clustering, the clustering with minimum mean squared error to this 'average' clustering is reported.
+
+A heatmap of \code{z.sim} may provide a useful visualisation, if appropriately ordered. The user is also invited to perform hierarchical clustering using \code{\link[stats]{hclust}} after first converting this similarity matrix to a distance matrix - "complete" linkage is recommended.
 }
 \note{
-This function is implemented purely in R and as such its performance in terms of speed and memory may not be optimal; it can take quite a considerable amount of time to run, and may crash if the number of observations &/or number of iterations is so large that the similarity matrix is insufficiently sparse. This function can optionally be called inside \code{\link{get_IMIFA_results}}.
+The \code{mcclust} package \strong{must} be loaded.
+
+This is liable to take quite some time to run, especially if the number of observations &/or number of iterations is large. Depending on how distinct the clusters are, \code{z.sim} may be stored better in a non-sparse format. This function can optionally be called inside \code{\link{get_IMIFA_results}}.
 }
 \examples{
 # Run a IMIFA model and extract the sampled cluster labels
@@ -32,23 +37,26 @@ This function is implemented purely in R and as such its performance in terms of
 # Get the similarity matrix and visualise it
 # zsimil <- Zsimilarity(zs)
 # z.sim  <- as.matrix(zsimil$z.sim)
-# z.sim2 <- replace(z.sim, z.sim == 0, NA)
-# image(z.sim2, col=heat.colors(30)[30:1]); box(lwd=2)
+# z.col  <- mat2cols(z.sim, cols=heat.colors(30)[30:1])
+# z.col[z.sim == 0] <- NA
+# plot_cols(z.col, na.col=par()$bg); box(lwd=2)
 
 # Extract the clustering with minimum squared distance to this
 # 'average' and evaluate its performance against the true labels
-# z.avg  <- zsimil$z.avg
-# table(z.avg, olive$area)
+# table(zsimil$z.avg, olive$area)
 
 # Perform hierarchical clustering on the distance matrix
 # Hcl    <- hclust(as.dist(1 - z.sim), method="complete")
 # plot(Hcl)
-# hier.z <- cutree(Hcl, k=3)
-# table(hier.z, olive$area)
+# table(cutree(Hcl, k=3), olive$area)
+}
+\references{
+Carmona, C., Nieto-barajas, L. and Canale, A. (2018) Model based approach for household clustering with mixed scale variables. \emph{Advances in Data Analysis and Classification}, 12: 1-25.
 }
 \seealso{
-\code{\link{get_IMIFA_results}}, \code{\link[slam]{as.simple_triplet_matrix}}, \code{\link[stats]{hclust}}
+\code{\link{get_IMIFA_results}}, \code{\link[slam]{simple_triplet_matrix}}, \code{\link[stats]{hclust}}, \code{\link[mcclust]{comp.psm}}, \code{\link[mcclust]{cltoSim}}
 }
 \author{
-Keefe Murphy
+Keefe Murphy - <\email{keefe.murphy@ucd.ie}>
 }
+\keyword{utility}
