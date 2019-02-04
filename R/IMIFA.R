@@ -1,13 +1,13 @@
 #' IMIFA: Infinite Mixtures of Infinite Factor Analysers and Related Models
 #'
-#' A package for Bayesian nonparameteric clustering of high-dimensional datasets, providing functions for fitting, diagnostic tools and plotting for Infinite Mixtures of Infinite Factor Analysers and the full suite of related models. Allows model based clustering with factor analytic covariance structures without recourse to model selection criteria to choose the number of clusters or cluster-specific latent factors. Model-specific diagnostic tools are also provided, as well as many options for plotting results, conducting posterior inference on parameters of interest, and quantifying uncertainty.
+#' A package for Bayesian nonparameteric clustering of high-dimensional datasets, providing functions for fitting, diagnostic tools and plotting for Infinite Mixtures of Infinite Factor Analysers and the full suite of related models. Allows model based clustering with factor analytic covariance structures without recourse to model selection criteria to choose the number of clusters or cluster-specific latent factors. Model-specific diagnostic tools are also provided, as well as many options for plotting results, conducting posterior inference on parameters of interest, posterior predictive checking, and quantifying uncertainty.
 #'
 #' @section Details:
 #' \itemize{
 #' \item{Type: }{Package}
 #' \item{Package: }{IMIFA}
-#' \item{Version: }{2.0.0}
-#' \item{Date: }{2018-05-01 (this version), 2017-02-02 (original release)}
+#' \item{Version: }{2.1.0}
+#' \item{Date: }{2019-02-04 (this version), 2017-02-02 (original release)}
 #' \item{Licence: }{GPL (>=2)}
 #' }
 #'
@@ -26,26 +26,25 @@
 #' Results obtained from get_IMIFA_Results are passed to this function with the type of plot desired specified by \code{plot.meth} (e.g. \code{"trace"}) and the parameter of interest specified by \code{param} (e.g. \code{"loadings"}).
 #'
 #' @author
-#' Keefe Murphy [aut, cre], Isobel Claire Gormley [ctb], Cinzia Viroli [ctb]
+#' Keefe Murphy [aut, cre], Cinzia Viroli [ctb], Isobel Claire Gormley [ctb]
 #'
 #' \strong{Maintainer}: Keefe Murphy - <\email{keefe.murphy@@ucd.ie}>
 #' @section References:
-#' Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+#' Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
 #'
 #' @section See Also:
 #' Further details and examples are given in the associated vignette document:\cr
 #' \code{vignette("IMIFA", package = "IMIFA")}
 #' @docType package
 #' @keywords package
-#' @name IMIFA
-NULL
+"_PACKAGE"
 
 .onAttach <- function(lib, pkg) {
   version <- read.dcf(file.path(lib, pkg, "DESCRIPTION"), "Version")
   if(interactive()) {
-    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\           Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\ \n/____/_/   /_/_____/_/  /_/     \\_\\               version", version, "\n"))
+    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\           Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\           and Related Models\n/____/_/   /_/_____/_/  /_/     \\_\\               version", version, "\n"))
   } else   {
-    packageStartupMessage("\nPackage 'IMIFA' version ", version, ".")
+    packageStartupMessage("\nPackage 'IMIFA' version ", version, ".\n")
   }
-  packageStartupMessage(paste("Type '?IMIFA' to see a brief guide to how to use this R package.\nType", sQuote(paste0("citation(", dQuote("IMIFA"),")")) ,"for citing the package in publications.\nType 'IMIFA_news()' to see new features, changes, and bug fixes."))
+  packageStartupMessage(paste("Type '?IMIFA' to see a brief guide to how to use this R package.\nType", sQuote(paste0("citation(", dQuote("IMIFA"),")")) ,"for citing the package in publications.\nType 'IMIFA_news()' to see new features, changes, and bug fixes.\n"))
 }

@@ -40,7 +40,7 @@ data(olive)
 #                         alpha.d1=3.5, nu=3, alpha.d2=7, prop=0.6, epsilon=0.12)
 
 ## ---- eval=FALSE---------------------------------------------------------
-#  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE, learn.d=TRUE)
+#  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE)
 
 ## ---- eval=FALSE---------------------------------------------------------
 #  resMFA  <- get_IMIFA_results(simMFA)
@@ -64,7 +64,7 @@ summary(resIMIFA)
 plot(resIMIFA, plot.meth="GQ", g=1)
 
 ## ---- results='hide', echo=FALSE-----------------------------------------
-plot(resIMIFA, plot.meth="GQ", g=2)
+suppressWarnings(plot(resIMIFA, plot.meth="GQ", g=2))
 
 ## ---- results='hide', echo=FALSE-----------------------------------------
 plot(resIMIFA, plot.meth="GQ", g=3)
@@ -78,8 +78,11 @@ plot(resIMIFA, plot.meth="zlabels", zlabels=olive$area, g=2)
 ## ---- results="hide"-----------------------------------------------------
 plot(resIMIFA, plot.meth="zlabels", g=4)
 
-## ------------------------------------------------------------------------
-plot(resIMIFA, plot.meth="zlabels", g=5)
+## ---- eval=FALSE---------------------------------------------------------
+#  plot(resIMIFA, plot.meth="zlabels", g=5)
+
+## ---- results='hide', echo=FALSE-----------------------------------------
+suppressMessages(plot(resIMIFA, plot.meth="zlabels", g=5))
 
 ## ------------------------------------------------------------------------
 plot(resIMIFA, plot.meth="means", param="means", mat=TRUE, g=1)
@@ -97,7 +100,10 @@ plot(resIMIFA, plot.meth="means", param="loadings", heat.map=TRUE, g=1)
 plot(resIMIFA, plot.meth="parallel.coords", param="uniquenesses")
 
 ## ------------------------------------------------------------------------
-plot(resIMIFA, plot.meth="errors")
+plot(resIMIFA, plot.meth="errors", g=1)
+
+## ------------------------------------------------------------------------
+plot(resIMIFA, plot.meth="errors", g=3)
 
 ## ---- fig.height=7-------------------------------------------------------
 plot(resIMIFA, plot.meth="all", param="alpha")

@@ -18,7 +18,7 @@ show_IMIFA_digit(res,
 
 \item{what}{A switch controlling whether the \code{"mean"} or \code{"last"} valid sample is to be plotted.}
 
-\item{dat}{The full grayscale grid data set. Necessary when \code{ind} is supplied or if pixels with standard deviation of 0 exist in the data set (which will have been automatically removed by \code{\link{mcmc_IMIFA}}).}
+\item{dat}{The full grayscale grid data set (prior to centering and scaling). Necessary when \code{ind} is supplied or if pixels with standard deviation of 0 exist in the data set (which will have been automatically removed by \code{\link{mcmc_IMIFA}}).}
 
 \item{ind}{The index of columns of \code{dat} which were discarded prior to fitting the \code{"IMIFA"}-related model via \code{\link{mcmc_IMIFA}}. Can be a vector of column indices of \code{dat} or an equivalent vector of logicals. The discarded pixels are replaced by the column-means corresponding to \code{ind} among images assigned to the given cluster \code{G}.}
 
@@ -33,6 +33,9 @@ Plots the posterior mean of a given cluster from an \code{"IMIFA"}-related model
 \details{
 This function is a wrapper to \code{\link{show_digit}} which supplies the posterior mean digit of a given cluster from a \code{"IMIFA"} model.
 }
+\note{
+Note that both centering and scaling of the original data prior to modelling is accounted for in reconstructing the means, but \code{dat}, if necessary, must be the raw data prior to pre-processing.
+}
 \examples{
 \dontrun{
 # Load the USPS data and discard peripheral digits
@@ -45,7 +48,7 @@ dat   <- train[,ind]
 # Fit an IMIFA model (warning: quite slow!)
 # sim <- mcmc_IMIFA(dat, n.iters=100, prec.mu=1e-03, z.init="kmeans",
                     centering=FALSE, scaling="none")
-# res <- get_IMIFA_results(sim, zlabels=ylab, z.avgsim=FALSE)
+# res <- get_IMIFA_results(sim, zlabels=ylab)
 
 # Examine the posterior mean image of the first two clusters
 show_IMIFA_digit(res, dat=train, ind=ind)

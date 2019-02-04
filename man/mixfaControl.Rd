@@ -5,7 +5,7 @@
 \title{Control settings for the IMIFA family of factor analytic mixtures}
 \usage{
 mixfaControl(n.iters = 25000L,
-             burnin = n.iters/5,
+             burnin = n.iters/5L,
              thinning = 2L,
              centering = TRUE,
              scaling = c("unit", "pareto", "none"),
@@ -13,10 +13,10 @@ mixfaControl(n.iters = 25000L,
              psi.alpha = 2.5,
              psi.beta = NULL,
              mu.zero = NULL,
-             sigma.mu = NULL,
-             prec.mu = 1L,
+             sigma.mu = 1L,
+             prec.mu = 0.01,
              sigma.l = 1L,
-             z.init = c("mclust", "hc", "kmeans", "list", "priors"),
+             z.init = c("hc", "kmeans", "list", "mclust", "priors"),
              z.list = NULL,
              equal.pro = FALSE,
              uni.prior = c("unconstrained", "isotropic"),
@@ -39,7 +39,7 @@ mixfaControl(n.iters = 25000L,
 
 \item{uni.type}{This argument specifies the type of constraint, if any, to be placed on the uniquenesses/idiosyncratic variances, i.e. whether a general diagonal matrix or isotropic diagonal matrix is to be assumed, and in turn whether these matrices are constrained to be equal across clusters. The default "\code{unconstrained}" corresponds to factor analysis (and mixtures thereof), whereas "\code{isotropic}" corresponds to probabilistic principal components analysers (and mixtures thereof).
 
-Constraints \emph{may} be particularly useful when \code{N < P}, though caution is advised when employing constraints for any of the infinite factor models, especially "\code{isotropic}" and "\code{single}", which may lead to overestimation of the number of clusters &/or factors if this specification is inappropriate. The four options correspond to the following 4 parsimonious Gaussian mixture models:
+Constraints \emph{may} be particularly useful when \code{N <= P}, though caution is advised when employing constraints for any of the infinite factor models, especially "\code{isotropic}" and "\code{single}", which may lead to overestimation of the number of clusters &/or factors if this specification is inappropriate. The four options correspond to the following 4 parsimonious Gaussian mixture models:
 \describe{
 \item{"\code{unconstrained}"}{(\strong{UUU}) - variable-specific and cluster-specific: \eqn{\Psi_g = \Psi_g}{Psi_g = Psi_g}.}
 \item{"\code{isotropic}"}{(\strong{UUC}) - cluster-specific, equal across variables: \eqn{\Psi_g = \psi\mathcal{I}_p}{Psi_g = (sigma^2)_g I_p}.}
@@ -50,33 +50,42 @@ The first letter \strong{U} here corresponds to constraints on loadings (not yet
 
 \item{psi.alpha}{The shape of the inverse gamma prior on the uniquenesses. Defaults to 2.5. Must be greater than 1 if \code{psi.beta} is \emph{not} supplied. Otherwise be warned that values less than or equal to 1 may not bound uniquenesses sufficiently far away from 0, and the algorithm may therefore terminate. Also, excessively small values may lead to critical numerical issues and should thus be avoided.}
 
-\item{psi.beta}{The rate of the inverse gamma prior on the uniquenesses. Can be either a single parameter, a vector of variable specific rates, or (if \code{psi0g} is \code{TRUE}) a matrix of variable and cluster-specific rates. If this is not supplied, \code{\link{psi_hyper}} is invoked to choose sensible values, depending on the value of \code{uni.prior} and, for the "\code{MFA}" and "\code{MIFA}" models, the value of \code{psi0g}. Excessively small values may lead to critical numerical issues and should thus be avoided.}
+\item{psi.beta}{The rate of the inverse gamma prior on the uniquenesses. Can be either a single parameter, a vector of variable specific rates, or (if \code{psi0g} is \code{TRUE}) a matrix of variable and cluster-specific rates. If this is not supplied, \code{\link{psi_hyper}} is invoked to choose sensible values, depending on the value of \code{uni.prior} and the data size and dimension, for the "\code{MFA}" and "\code{MIFA}" models only, the value of \code{psi0g}. Excessively small values may lead to critical numerical issues and should thus be avoided.
+
+Note that optional arguments to \code{psi_hyper} can be supplied via the \code{...} construct here.}
 
 \item{mu.zero}{The mean of the prior distribution for the mean parameter. Either a scalar of a vector of appropriate dimension. Defaults to the sample mean of the data.}
 
-\item{sigma.mu}{The covariance of the prior distribution for the mean parameter. Always assumed to be a diagonal matrix. Can be a scalar times the identity or a vector of appropriate dimension. If supplied as a matrix, only the diagonal elements will be extracted. Defaults to the diagonal entries of the sample covariance matrix.}
+\item{sigma.mu}{The covariance of the prior distribution for the cluster mean parameters. Always assumed to be a diagonal matrix, and set to the identity matrix by default. Can also be a scalar by which the identity is multiplied, a vector of appropriate dimension; if supplied as a matrix, only the diagonal elements will be extracted. Specifying \code{sigma.mu=NULL} will use the diagonal entries of the sample covariance matrix: for unit-scaled data this is simply the identity again. See \code{prec.mu} for further control over the hypercovariance in the prior for the means.}
 
-\item{prec.mu}{A scalar controlling the degree of flatness of the prior by scaling \code{sigma.mu} (i.e. multiplying every element of \code{sigma.mu} by \code{1/prec.mu}). Lower values lead to a more diffuse prior. Defaults to \code{1}. The user can supply a scaled \code{sigma.mu} directly, but this argument is especially useful when the diagonal default is used for \code{sigma.mu}.}
+\item{prec.mu}{A scalar controlling the degree of flatness of the prior for the cluster means by scaling \code{sigma.mu} (i.e. multiplying every element of \code{sigma.mu} by \code{1/prec.mu}). Lower values lead to a more diffuse prior. Defaults to \code{0.01}, such that the prior is relatively non-informative by default. Of course, \code{prec.mu=1} nullifies any effect of this argument. The user can supply a scaled \code{sigma.mu} directly, but this argument is especially useful when specifying \code{sigma.mu=NULL}, such that the diagonal entries of the sample covariance matrix are used.}
 
-\item{sigma.l}{A scalar controlling the diagonal covariance of the prior distribution for the loadings. Defaults to 1, i.e. the identity. Only relevant for the finite factor methods.}
+\item{sigma.l}{A scalar controlling the diagonal covariance of the prior distribution for the loadings. Defaults to \code{1}, i.e. the identity; otherwise a diagonal matrix with non-zero entries all equal to \code{sigma.l} Only relevant for the finite factor methods.}
 
-\item{z.init}{The method used to initialise the cluster labels. Defaults to \code{\link[mclust]{Mclust}}. Other options include \code{\link[stats]{kmeans}} (with 10 random starts, by default), hierarchical clustering via \code{\link[mclust]{hc}} (\code{VVV} is used by default, unless the data is high-dimensional, in which case the default is \code{EII}), random initialisation via \code{priors}, and a user-supplied \code{list} (\code{z.list}). Not relevant for the "\code{FA}" and "\code{"IFA"} methods. Arguments for the relevant functions be passed via the \code{...} construct.}
+\item{z.init}{The method used to initialise the cluster labels. Defaults to model-based agglomerative hierarchical clustering via \code{"\link[mclust]{hc}"}. Other options include \code{"\link[stats]{kmeans}"} (with 10 random starts, by default), \code{\link[mclust]{Mclust}} via \code{"mclust"}, random initialisation via \code{"priors"}, and a user-supplied \code{"list"} (\code{z.list}). Not relevant for the "\code{FA}" and "\code{"IFA"} methods. Arguments for the relevant functions can be passed via the \code{...} construct. For \code{"\link[mclust]{hc}"}, \code{VVV} is used by default, unless the data is high-dimensional, in which case the default is \code{EII}. The option \code{"priors"} may lead to empty components at initialisation, which will return an error.
+
+In any case, unless \code{z.list} is explicitly supplied, or \code{verbose} is \code{FALSE}, the initial cluster sizes will be printed to the screen to alert users to potentially bad initialisiations (e.g. heavily imbalanced initial cluster sizes).}
 
 \item{z.list}{A user supplied list of cluster labels. Only relevant if \code{z.init == "z.list"}.}
 
 \item{equal.pro}{Logical variable indicating whether or not the mixing mixing proportions are to be equal across clusters in the model (default = \code{FALSE}). Only relevant for the "\code{MFA}" and "\code{MIFA}" methods.}
 
-\item{uni.prior}{A switch indicating whether uniquenesses rate hyperparameters are to be "\code{unconstrained}" or "\code{isotropic}", i.e. variable-specific or not. "\code{uni.prior}" must be "\code{isotropic}" if the last letter of "\code{uni.type}" is \strong{C}, but can take either value otherwise. Defaults to correspond to the last letter of \code{uni.type} if that is supplied and \code{uni.prior} is not, otherwise defaults to "\code{unconstrained}" (though"\code{isotropic}" is recommended when \code{N < P}). Only relevant when "\code{psi.beta}" is not supplied and \code{\link{psi_hyper}} is therefore invoked.}
+\item{uni.prior}{A switch indicating whether uniquenesses rate hyperparameters are to be "\code{unconstrained}" or "\code{isotropic}", i.e. variable-specific or not. "\code{uni.prior}" must be "\code{isotropic}" if the last letter of "\code{uni.type}" is \strong{C}, but can take either value otherwise. Defaults to correspond to the last letter of \code{uni.type} if that is supplied and \code{uni.prior} is not, otherwise defaults to "\code{unconstrained}" (though"\code{isotropic}" is recommended when \code{N <= P}). Only relevant when "\code{psi.beta}" is not supplied and \code{\link{psi_hyper}} is therefore invoked (with optional arguments passable via the \code{...} construct).}
 
 \item{mu0g}{Logical indicating whether the \code{mu.zero} hyperparameter can be cluster-specific. Defaults to \code{FALSE}. Only relevant for the "\code{MFA}" and "\code{MIFA}" methods when \code{z.list} is supplied.}
 
 \item{psi0g}{Logical indicating whether the \code{psi.beta} hyperparameter(s) can be cluster-specific. Defaults to \code{FALSE}. Only relevant for the "\code{MFA}" and "\code{MIFA}" methods when \code{z.list} is supplied, and only allowable when \code{uni.type} is one of \code{unconstrained} or \code{isotropic}.}
 
-\item{drop0sd}{Logical indicating whether to drop variables with no standard deviation (defaults to \code{TRUE}). This is \emph{strongly} recommended, especially a) when \code{psi.beta} &/or \code{sigma.mu} are not supplied, and the defaults are therefore estimated using the empirical covariance matrix, &/or b) if some form of posterior predictive checking is subsequently desired when calling \code{\link{get_IMIFA_results}}.}
+\item{drop0sd}{Logical indicating whether to drop variables with no standard deviation (defaults to \code{TRUE}). This is \emph{strongly} recommended, especially a) when \code{psi.beta} is not supplied &/or \code{sigma.mu=NULL}, and either/both are therefore estimated using the empirical covariance matrix, &/or b) if some form of posterior predictive checking is subsequently desired when calling \code{\link{get_IMIFA_results}}.}
 
 \item{verbose}{Logical indicating whether to print output (e.g. run times) and a progress bar to the screen while the sampler runs. By default is \code{TRUE} if the session is interactive, and \code{FALSE} otherwise. If \code{FALSE}, warnings and error messages will still be printed to the screen, but everything else will be suppressed.}
 
-\item{...}{Additional arguments to be passed to \code{\link[mclust]{Mclust}} (\code{modelNames} only), \code{\link[mclust]{hc}} (\code{modelName} & \code{use} only), or \code{\link[stats]{kmeans}} (\code{iter.max} and \code{nstart} only) can be passed here, depending on the value of \code{z.init}. Also catches unused arguments.}
+\item{...}{Also catches unused arguments. A number of optional arguments can be also supplied here:
+\itemize{
+\item{The additional \code{\link{psi_hyper}} argument \code{beta0}, especially when \code{N <= P}.}
+\item{Additional arguments to be passed to \code{\link[mclust]{hc}} (\code{modelName} & \code{use} only), to \code{\link[mclust]{Mclust}} (\code{modelNames}, and the arguments for \code{\link[mclust]{hc}} with which \code{\link[mclust]{Mclust}} is itself initialised - \code{modelName} & \code{use}), or to \code{\link[stats]{kmeans}} (\code{iter.max} and \code{nstart} only), depending on the value of \code{z.init}.}
+\item{Additionally, when \code{z.init="mclust"}, \code{criterion} can be passed here (can be "\code{icl}" or "\code{bic}", the default) to control how the optimum \code{\link[mclust]{Mclust}} model to initialise with is determined.}
+}}
 }
 \value{
 A named list in which the names are the names of the arguments and the values are the values of the arguments.
@@ -84,22 +93,27 @@ A named list in which the names are the names of the arguments and the values ar
 \description{
 Supplies a list of arguments for use in \code{\link{mcmc_IMIFA}} pertaining to \emph{ALL} methods in the \code{IMIFA} family: eg. MCMC settings, cluster initialisation, generic hyperparameters for factor-analytic mixtures, etc.
 }
+\note{
+Users should be careful to note that data are mean-centered (\code{centering=TRUE}) and unit-scaled (\code{scaling="unit"}) by default when supplying other parameters among the list above, especially those related in any way to \code{psi.hyper}, or to the other control functions \code{\link{mgpControl}} and \code{\link{bnpControl}}.
+}
 \examples{
-mfctrl <- mixfaControl(n.iters=200, scaling="pareto",
-                      uni.type="constrained", prec.mu=1E-06)
+mfctrl <- mixfaControl(n.iters=200, prec.mu=1E-03, sigma.mu=NULL,
+                       beta0=1, uni.type="constrained")
 
 # data(olive)
 # sim  <- mcmc_IMIFA(olive, "IMIFA", mixFA=mfctrl)
 
 # Alternatively specify these arguments directly
-# sim  <- mcmc_IMIFA(olive, "IMIFA", n.iters=20000, prec.mu=1E-06,
-#                    scaling="pareto", uni.type="constrained")
+# sim  <- mcmc_IMIFA(olive, "IMIFA", n.iters=200, prec.mu=1E-03,
+#                    sigma.mu=NULL, beta0=1, uni.type="constrained")
 }
 \references{
-Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+
+McNicholas, P. D. and Murphy, T. B. (2008) Parsimonious Gaussian Mixture Models, \emph{Statistics and Computing}, 18(3): 285-296.
 }
 \seealso{
-\code{\link{mcmc_IMIFA}}, \code{\link{psi_hyper}}
+\code{\link{mcmc_IMIFA}}, \code{\link{psi_hyper}}, \code{\link[mclust]{hc}}, \code{\link[stats]{kmeans}}, \code{\link[mclust]{Mclust}}, \code{\link{mgpControl}}, \code{\link{bnpControl}}, \code{\link{storeControl}}
 }
 \author{
 Keefe Murphy - <\email{keefe.murphy@ucd.ie}>

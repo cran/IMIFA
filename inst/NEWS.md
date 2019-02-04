@@ -1,12 +1,98 @@
 __Infinite Mixtures of Infinite Factor Analysers__
 ==================================================  
 
+## IMIFA v2.1.0 - (_7<sup>th</sup> release [minor update]: 2019-02-04_)
+### New Features
+* `mgpControl` gains the arguments `cluster.shrink` and `sigma.hyper`:
+    * `cluster.shrink` governs invocation of cluster shrinkage MGP hyperparameter for MIFA/OMIFA/IMIFA methods.
+    * `sigma.hyper` controls the gamma hyperprior on this parameter. The posterior mean is reported, where applicable.
+    * Full conditionals for loadings and local/column shrinkage MGP hyperparameters edited accordingly.
+* Allowed the Dirichlet concentration parameter `alpha` to be learned via MH steps for the OM(I)FA models.  
+    * Also allowed diminishing adaptation to tune the log-normal proposal to achieve a target acceptance rate.
+    * Thus `bnpControl` args. `learn.alpha`, `alpha.hyper`, `zeta`, & `tune.zeta` become relevant for OM(I)FA models.
+* New posterior predictive model checking approach added to `get_IMIFA_results` (with associated plots):  
+  Posterior Predictive Reconstruction Error (PPRE) compares bin counts of the original data with corresponding  
+  counts for replicate draws from the posterior predictive distribution using a standardised Frobenius norm.
+* Added new function `scores_MAP` to decompose factor scores summaries  
+  from `get_IMIFA_resuls` into submatrices corresponding to the MAP partition.
+* Added new wrapper function `sim_IMIFA_model` to call `sim_IMIFA_data` using  
+  the estimated parameters from fitted `Results_IMIFA` objects.
+* New `get_IMIFA_results` arg. `vari.rot` allows loadings templates to be varimax rotated,  
+  prior to Procrustes rotation, for more interpretable solutions (defaults to `FALSE`).
+* New `plot.Results_IMIFA` argument `common` governing `plot.meth="means"` plots (details in documentation).
+  
+### Improvements
+* New hyperparameter/argument defaults:
+    * `sigma.mu` defaults to `1` s.t. the hypercovariance is the identity for the prior on the means;  
+      old behaviour (using the diagonal of the sample covariance matrix) recoverable by specifying `sigma.mu=NULL`.
+    * `prec.mu` defaults to `0.01` s.t. the prior on the cluster means is flat by default.
+    * `learn.d` defaults to `TRUE` s.t. a PYP prior is assumed for IM(I)FA models by default.
+    * `alpha.hyper` now has a larger hyper-rate by default, to better encourage clustering.
+    * `alpha.d1` & `alpha.d2` now set to `2.1`/`3.1` rather than `2`/`6` to discourage exponentially fast shrinkage.
+    * `z.init` now defaults to `"hc"`: model-based agglomerative hierarchical clustering.
+* Overhauled `psi_hyper` (details in documentation) for:  
+    * `N <= P` data where the sample covariance matrix is not invertible.
+    * `type="isotropic"` uniquenesses.
+* Args. `scores` & `loadings` can now be supplied to `sim_IMIFA_data` directly;  
+  new arg. `non.zero` controls the # effective factors (per column & cluster) when `loadings` are instead simulated.
+* Sped-up 2<sup>nd</sup> label-switching move for IM(I)FA models (accounting for empty clusters).
+* Args. for `hc` can now be passed when `init.z="mclust"` also  
+  (previously only `"hc"`), thus controlling how `Mclust` is itself initialised.
+* Allowed `criterion` to be passed via `...` in `mixfaControl` to choose between  
+  `mclustBIC`/`mclustICL` to determine optimum model to initialise with when  
+  `z.init="mclust"` & also sped-up `mclust` initialisation in the process.
+* Added `stop.AGS` arg. to `mgpControl`: renamed `adapt.at` to `start.AGS` for consistency.
+* Added `start.zeta` & `stop.zeta` options to `tune.zeta` argument in `bnpControl`.
+* Allowed user-supplied `breaks` in the plotting functions `mat2cols` & `heat_legend`.
+* Initial cluster sizes are now shown in order to alert users to potentially bad starting values.
+* Added utility function `pareto_scale()`.
+
+### Bug Fixes
+* Fixed factor _scores_ & error metrics issues in `get_IMIFA_results` for clustering methods:  
+    * Fixed storage of scores for infinite factor methods - now corresponds to samples where the  
+      largest cluster-specific number of factors is `>=` the max of the modal estimates of the same  
+      (previously samples where __any__ cluster has `>=` the corresponding modal estimate were used):  
+      thus, valid samples for computing error metrics also fixed and Procrustes rotation also sped-up.  
+    * Other Procrustes rotation fixes to account for label-switching.  
+    * Other Procrustes rotation fixes specific to the IMFA/OMFA methods.
+* `range.G` and `trunc.G` defaults fixed, especially for small sample size settings. 
+* Slight label-switching fixes when `zlabels` are supplied to `get_IMIFA_results`;  
+  posterior confusion matrix, cluster sizes vector, and the sampled labels themselves effected.
+* Prevented unnecessary Procrustes rotation for single-factor components, thus fixing some bugs.
+* Fixed initialisation of uniquenesses to account for all four settings of `uni.type`.
+* Allowed conditioning on iterations with all components populated for M(I)FA models in `get_IMIFA_results`.
+* Accounted for 1-component IM(I)FA/OM(I)FA models in `get_IMIFA_results`.
+* Fixed handling of empty components when simulating cluster labels from priors in `mcmc_IMIFA` & `sim_IMIFA_data`.
+* Ensured no. of factors `Q` cannot exceed no. of observations in the corresponding cluster in `sim_IMIFA_data`.
+* Slight speed-up to updating MGP hyperparameters in the presence of empty MIFA/OMIFA/IMIFA components.
+* Slight speed-up to sampling cluster labels with slice indicators for IM(I)FA models.
+* Explicitly allowed Pitman-Yor special case where `alpha=0` for IM(I)FA models;  
+  added related controls on spike-and-slab prior for `discount` when fixing `alpha<=0`.
+* Allowed full range of `hc` model types for initialisation purposes via `...` in `mixfaControl`.
+* Clarified `dimnames` of `get_IMIFA_results` output in `x$Loadings` & `x$Scores`.
+* Fixed storage switches & iteration indices to better account for `burnin=0`.
+* Fixed plotting of exact zeros in posterior confusion matrix.
+* Fixed plotting posterior mean loadings heatmap when one or more clusters have zero factors.
+* Fixed plotting scores for (I)FA models due to bug in previous update, esp. with `zlabels` supplied.
+* Fixed `show_IMIFA_digit` to better account for missing pixels &/or the data having been centered/scaled.
+* Fixed simulation of `psi` when not supplied to `sim_IMIFA_data` to IG rather than GA.
+* Fixed bug preventing `Q` to be supplied to `get_IMIFA_results` for infinite factor methods.
+* Fixed y-axis labelling in uncertainty type plots when `plot.meth="zlabels"`.
+* Small fixes to function `show_digit`.
+* Better handling of tied model-selection criteria in `get_IMIFA_results`.
+* `Procrustes` now works when `X` has fewer columns than `Xstar`.
+* Minor cosmetic change for overplotting `scores` & `loadings` in `trace` & `density` plots.
+* Edited `Ledermann` and related warnings to account for case of isotropic uniquenesses.
+* Tidied indentation/line-breaks for `cat`/`message`/`warning` calls for printing clarity.
+* Corrected `IMIFA-package` help file (formerly just `IMIFA`).
+* Edited `CITATION` file and authorship.
+
 ## IMIFA v2.0.0 - (_6<sup>th</sup> release [major update]: 2018-05-01_)
 ### Major Changes
 * Simplified `mcmc_IMIFA` by consolidating arguments using new helper functions (with defaults):  
     * Args. common to all factor-analytic mixture methods & MCMC settings supplied via `mixfaControl`.
     * MGP & AGS args. supplied via `mgpControl` for infinite factor models.  
-    * Dirichlet/Pitman-Yor Process args. supplied via `bnpControl` for infinite mixture models.
+    * Pitman-Yor/Dirichlet Process args. supplied via `bnpControl` for infinite mixture models.
     * Storage switch args. supplied via `storeControl`.
     * New functions also inherit the old documentation for their arguments.
 
@@ -34,8 +120,7 @@ __Infinite Mixtures of Infinite Factor Analysers__
 ### Improvements
 * Retired args. `nu` & `nuplus1` to `mgpControl`, replaced by ability to specify more general gamma prior,  
   via new `phi.hyper` arg. specifying shape _and_ rate - `mgp_check` has also been modified accordingly.
-* `Zsimilarity` sped-up via the `comp.psm` & `cltoSim` functions s.t. when # observations < 1000,  
-  `z.avgsim=TRUE` now by default in `get_IMIFA_results` (when suggested `mcclust` package is loaded).
+* `Zsimilarity` sped-up via the `comp.psm` & `cltoSim` functions s.t. when # observations < 1000.
 * Matrix of posterior cluster membership probabilities now returned by `get_IMIFA_results`.
 * Modified AGS to better account for when the number of group-specific latent factors shrinks to zero.
 * `psi.alpha` no longer needs to be strictly greater than 1, unless the default `psi.beta` is invoked;  
@@ -47,7 +132,7 @@ __Infinite Mixtures of Infinite Factor Analysers__
 * Speed-ups due to new `Rfast` utility functions: `colTabulate` & `matrnorm`.
 * Speed-ups due to utility functions from `matrixStats`, on which `IMIFA` already depends.
 * Slight improvements when `adapt=FALSE` for infinite factor models with fixed high truncation level.
-* Misclassified observations now highlighted in 1st type of uncertainty plot in `Plot.Results_IMIFA`,  
+* Misclassified observations now highlighted in 1<sup>st</sup> type of uncertainty plot in `Plot.Results_IMIFA`,  
   when `plot.meth="zlabels"` and the true `zlabels` are supplied.
 * `mixfaControl` gains arg. `drop0sd` to control removal of zero-variance features (defaults to `TRUE`).
 * `heat_legend` gains `cex.lab` argument to control magnification of legend text.
@@ -71,10 +156,8 @@ __Infinite Mixtures of Infinite Factor Analysers__
 * Fixed treatment of exact zeros when plotting average clustering similarity matrix.
 * Fixed tiny bug when neither centering nor scaling (of any kind) are applied to data within `mcmc_IMIFA`.
 * Fixed plotting of posterior mean scores when one or more clusters are empty.
-* Fixed storage switches to account for `burnin=0`.
 * Fixed bug with default plotting palette for data sets with >1024 variables.
 * Fixed bug with label switching permutations in `get_IMIFA_results` when there are empty clusters.
-* Fixed bug when plotting posterior mean loadings heatmap when one or more clusters have zero factors.
 * Fixed `print` and `summary` functions for objects of class `IMIFA` and `Results_IMIFA`.
 * Fixed calculating posterior mean `zeta` when adaptively targeting `alpha`'s optimal MH acceptance rate.
 * Allowed `alpha` be tiny for (O)M(I)FA models (provided `z.init != "priors"` for overfitted models).
@@ -84,8 +167,8 @@ __Infinite Mixtures of Infinite Factor Analysers__
 * Ensured `sigma.mu` hyperparameter arg. is always coerced to diagonal entries of a covariance matrix.
 * Transparency default in `plot.Results_IMIFA` now depends on device's support of semi-transparency.
 * Replaced certain instances of `is.list(x)` with `inherits(x, "list")` for stricter checking.
-* Added `check.margin=FALSE` to calls to `sweep()`.
-* `Ledermann()`, `MGP_check`, and `PGMM_dfree` are now properly vectorised.
+* Added `check.margin=FALSE` to calls to `sweep`.
+* `Ledermann`, `MGP_check`, and `PGMM_dfree` are now properly vectorised.
 
 ### Miscellaneous Edits
 * Added `USPSdigits` data set (training and test),  
@@ -158,7 +241,8 @@ __Infinite Mixtures of Infinite Factor Analysers__
 ## IMIFA v1.2.0 - (_2<sup>nd</sup> release [minor update]: 2017-05-09_)
 ### New Features
 * Learning the Pitman-Yor `discount` & `alpha` parameters via Metropolis-Hastings now implemented.  
-  Plotting function's `param` argument gains the option `discount` for posterior inference.
+    * Spike-and-slab prior specified for `discount`: size of spike controlled by arg. `kappa`.
+    * Plotting function's `param` argument gains the option `discount` for posterior inference.
 * Sped up simulating cluster labels from unnormalised log probabilities using the Gumbel-Max trick (Yellott, 1977):  
   `gumbel_max` replaces earlier function to sample cluster labels and is now unhidden/exported/documented.
 * Added new plot when `plot.meth=GQ` for OM(I)FA/IM(I)FA models depicting trace of #s of active/non-empty clusters.
@@ -180,7 +264,7 @@ __Infinite Mixtures of Infinite Factor Analysers__
   `rDirichlet` replaces earlier function to sample mixing proportions and is now unhidden/exported/documented.
 * Deferred setting `dimnames` attributes in `mcmc_IMIFA` to `get_IMIFA_results`: lower memory burden/faster simulations.
 * Jettisoned superfluous duplicate material in object outputted from `get_IMIFA_results` to reduce size/simplify access.
-* IMFA/IMIFA `trunc.G` arg, the max allowable # active clusters, defaults to `range.G` and # active clusters now stored.
+* Restored the IMFA/IMIFA arg. `trunc.G`, the max allowable # active clusters, and # active clusters now stored.
 * Code sped up when `active` G=1 by not simulating labels for IM(I)FA models.
 * Reduced chance of crash by exceeding memory capacity; `score.switch` defaults to `FALSE` if # models ran is large.
 

@@ -5,15 +5,21 @@
 \title{Add a colour key legend to heatmap plots}
 \usage{
 heat_legend(data,
-            cols,
-            cex.lab = 1)
+            cols = NULL,
+            breaks = NULL,
+            cex.lab = 1,
+            ...)
 }
 \arguments{
 \item{data}{Either the data with which the heatmap was created or a vector containing its minimum and maximum values. Missing values are ignored.}
 
-\item{cols}{The palette used when the heatmap was created.}
+\item{cols}{The colour palette used when the heatmap was created. By default, the same \code{\link[viridisLite]{viridis}} default as in \code{\link{mat2cols}} is used. Will be checked for validity by \code{\link{is.cols}}.}
+
+\item{breaks}{Optional argument giving the break-points for the axis labels}
 
 \item{cex.lab}{Magnification of axis annotation, indicating the amount by which plotting text and symbols should be scaled relative to the default of 1.}
+
+\item{...}{Catches unused arguments.}
 }
 \value{
 Modifies an existing plot by adding a colour-key legend.
@@ -25,7 +31,7 @@ Using only base graphics, this function appends a colour key legend for heatmaps
 # Generate a matrix, flip it, and plot it with a legend
 data <- matrix(rnorm(50), nrow=10, ncol=5)
 cols <- heat.colors(12)[12:1]
-par(mar=c(5.1, 4.1, 4.1, 4.1))
+par(mar=c(5.1, 4.1, 4.1, 3.1))
 
 image(t(data)[,nrow(data):1], col=cols)
 heat_legend(data, cols); box(lwd=2)

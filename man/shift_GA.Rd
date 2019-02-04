@@ -6,7 +6,7 @@
 \usage{
 shift_GA(shape,
          rate,
-         shift = 0L,
+         shift = 0,
          param = c("rate", "scale"))
 }
 \arguments{
@@ -21,6 +21,9 @@ A list of length 2, containing the modified shape and rate parameters, respectiv
 }
 \description{
 This function takes shape and rate parameters of a Gamma distribution and modifies them to achieve the same expected value and variance when the left extent of the support of the distribution is shifted up or down.
+}
+\note{
+This function is invoked within \code{\link{mcmc_IMIFA}} when \code{discount} is \emph{fixed} at a non-zero value and \code{learn.alpha=TRUE}.
 }
 \examples{
 # Shift a Ga(shape=4, rate=2) distribution to the left by 1;

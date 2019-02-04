@@ -20,6 +20,7 @@
      by.fac = FALSE,
      type = c("h", "n", "p", "l"),
      intervals = TRUE,
+     common = TRUE,
      partial = FALSE,
      titles = TRUE,
      transparency = 0.75,
@@ -33,13 +34,14 @@
 Special types of plots which don't require a \code{param} are:
 \describe{
 \item{"\code{GQ}"}{for plotting the posterior summaries of the numbers of clusters/factors, if available.}
-\item{"\code{zlabels}"}{for plotting clustering uncertainties - in four different ways (incl. the posterior confusion matrix) - if clustering has taken place, with or without the clustering labels being supplied via the \code{zlabels} argument. If available, the average similarity matrix, reordered according to the MAP labels, is shown as the 5-th plot.}
-\item{"\code{errors}"}{for conducting posterior predictive checking of the appropriateness of the fitted model by visualising the error metrics quantifying the difference between the estimated and empirical covariance matrices. The type of plot produced depends on how the \code{error.metrics} argument was supplied to \code{\link{get_IMIFA_results}}.}
-}}
+\item{"\code{zlabels}"}{for plotting clustering uncertainties - in four different ways (incl. the posterior confusion matrix) - if clustering has taken place, with or without the clustering labels being supplied via the \code{zlabels} argument. If available, the average similarity matrix, reordered according to the MAP labels, is shown as a 5-th plot.}
+\item{"\code{errors}"}{for conducting posterior predictive checking of the appropriateness of the fitted model by visualising the posterior predictive reconstruction error (PPRE) &/or histograms comparing the data to replicate draws from the posterior distribution &/or error metrics quantifying the difference between the estimated and empirical covariance matrices. The type of plot(s) produced depends on how the \code{error.metrics} argument was supplied to \code{\link{get_IMIFA_results}} and what parameters were stored.}
+}
+The argument \code{g} can be used to cycle through the available plots in each case. \code{ind} can also be used to govern which variable is shown for the 2-nd plot.}
 
-\item{param}{The parameter of interest for any of the following \code{plot.meth} options: \code{all}, \code{trace}, \code{density}, \code{means}, \code{correlation}. The \code{param} must have been stored when \code{\link{mcmc_IMIFA}} was initially ran. Includes \code{pis} for methods where clustering takes place, and allows posterior inference on \code{alpha} and \code{discount} for the "\code{IMFA}" and "\code{IMIFA}" methods.}
+\item{param}{The parameter of interest for any of the following \code{plot.meth} options: \code{all}, \code{trace}, \code{density}, \code{means}, \code{correlation}. The \code{param} must have been stored when \code{\link{mcmc_IMIFA}} was initially ran. Includes \code{pis} for methods where clustering takes place, and allows posterior inference on \code{alpha} (for the "\code{IMFA}", "\code{IMIFA}", "\code{OMFA}", and "\code{OMIFA}" methods) and \code{discount} (for the "\code{IMFA}" and "\code{IMIFA}" methods). Otherwise \code{means}, \code{scores}, \code{loadings}, and \code{uniquenesses} can be plotted.}
 
-\item{g}{Optional argument that allows specification of exactly which cluster the plot of interest is to be produced for. If not supplied, the user will be prompted to cycle through plots for all clusters. Also functions as an index for which plot to return when \code{plot.meth} is \code{GQ} or \code{zlabels} in much the same way.}
+\item{g}{Optional argument that allows specification of exactly which cluster the plot of interest is to be produced for. If not supplied, the user will be prompted to cycle through plots for all clusters. Also functions as an index for which plot to return when \code{plot.meth} is \code{GQ}, \code{zlabels}, or \code{errors} in much the same way.}
 
 \item{mat}{Logical indicating whether a \code{\link[graphics]{matplot}} is produced (defaults to \code{TRUE}). If given as \code{FALSE}, \code{ind} is invoked.}
 
@@ -51,15 +53,19 @@ Special types of plots which don't require a \code{param} are:
 
 \item{palette}{An optional colour palette to be supplied if overwriting the default palette set inside the function by \code{\link[viridisLite]{viridis}} is desired. it makes little sense to a supply a \code{palette} when \code{plot.meth="all"} and \code{param} is one of "\code{scores}" or "\code{loadings}".}
 
-\item{ind}{Either a single number indicating which variable to plot when \code{param} is one of \code{means} or \code{uniquenesses}, or which cluster to plot if \code{param} is \code{pis}. If \code{scores} are plotted, a vector of length two giving which observation and factor to plot; If \code{loadings} are plotted, a vector of length two giving which variable and factor to plot. Will be recycled to length 2 if necessary. Only relevant when \code{mat} is \code{FALSE}.}
+\item{ind}{Either a single number indicating which variable to plot when \code{param} is one of \code{means} or \code{uniquenesses} (or \code{plot.meth="errors"}), or which cluster to plot if \code{param} is \code{pis}. If \code{scores} are plotted, a vector of length two giving which observation and factor to plot; if \code{loadings} are plotted, a vector of length two giving which variable and factor to plot. Will be recycled to length 2 if necessary. Also governs which two factors are displayed on posterior mean plots of the \code{"scores"} when \code{heat.map} is \code{FALSE}; otherwise only relevant when \code{mat} is \code{FALSE}.}
 
 \item{fac}{Optional argument that provides an alternative way to specify \code{ind[2]} when \code{mat} is \code{FALSE} and \code{param} is one of \code{scores} or \code{loadings}.}
 
-\item{by.fac}{Optionally allows (mat)plotting of scores and loadings by factor - i.e. observation(s) (scores) or variable(s) (loadings) for a given factor, respectively, controlled by \code{ind} or \code{fac}) when set to \code{TRUE}. Otherwise factor(s) are plotted for a given observation or variable when set to \code{FALSE} (the default), again controlled by \code{ind} or \code{fac}. Only relevant when \code{param} is one of \code{scores} or \code{loadings}.}
+\item{by.fac}{Optionally allows (mat)plotting of scores and loadings by factor - i.e. observation(s) (scores) or variable(s) (loadings) for a given factor, respectively, controlled by \code{ind} or \code{fac}) when set to \code{TRUE}. Otherwise all factor(s) are plotted for a given observation or variable when set to \code{FALSE} (the default), again controlled by \code{ind} or \code{fac}. Only relevant when \code{param} is one of \code{scores} or \code{loadings}.}
 
 \item{type}{The manner in which the plot is to be drawn, as per the \code{type} argument to \code{\link{plot}}.}
 
 \item{intervals}{Logical indicating whether credible intervals around the posterior mean(s) are to be plotted when \code{is.element(plot.meth, c("all", "means"))}. Defaults to \code{TRUE}, but can only be \code{TRUE} when \code{show.last} is \code{FALSE}.}
+
+\item{common}{Logical indicating whether plots with \code{plot.meth="means"} (or the corresponding plots for \code{plot.meth="all"}) when \code{param} is one of \code{"means"}, \code{"scores"}, \code{"loadings"}, or \code{"uniquenesses"} are calibrated to a common scale based on the range of the \code{param} parameters across all clusters (defaults to \code{TRUE}, and only relevant when there are clusters). Otherwise, the only the range corresponding to the image being plotted is used to determine the scale.
+
+Note that this affects the \code{"loadings"} and \code{"scores"} plots regardless of the value of \code{heat.map}. An exception is the \code{"scores"} plots when \code{plot.meth="means"} and \code{heat.map} is \code{FALSE}, in which case \code{common} defaults to \code{FALSE}.}
 
 \item{partial}{Logical indicating whether plots of type "\code{correlation}" use the PACF. The default, \code{FALSE}, ensures the ACF is used. Only relevant when \code{plot.meth = "all"}, otherwise both plots are produced when \code{plot.meth = "correlation"}.}
 
@@ -67,7 +73,7 @@ Special types of plots which don't require a \code{param} are:
 
 \item{transparency}{A factor in [0, 1] modifying the opacity for overplotted lines. Defaults to 0.75, unless semi-transparency is not supported. Only relevant when \code{palette} is not supplied, otherwise the supplied \code{palette} must already be adjusted for transparency.}
 
-\item{...}{Other arguments typically passed to \code{\link[graphics]{plot}}.}
+\item{...}{Other arguments typically passed to \code{\link[graphics]{plot}} or the \code{breaks} argument to \code{\link{mat2cols}} and \code{\link{heat_legend}} when heatmaps are plotted.}
 }
 \value{
 The desired plot with appropriate output and summary statistics printed to the console screen.
@@ -77,6 +83,8 @@ Plotting output and parameters of inferential interest for IMIFA and related mod
 }
 \note{
 Supplying the argument \code{zlabels} does \strong{not} have the same effect of reordering the sampled parameters as it does if supplied directly to \code{\link{get_IMIFA_results}}.
+
+When \code{mat} is \code{TRUE} and \code{by.fac} is \code{FALSE} (both defaults), the convention for dealing with overplotting for \code{trace} and \code{density} plots when \code{param} is either \code{scores} or \code{loadings} is to plot the last factor first, such that the first factor appears 'on top'.
 }
 \examples{
 # See the vignette associated with the package for more graphical examples:
@@ -94,8 +102,14 @@ Supplying the argument \code{zlabels} does \strong{not} have the same effect of 
 # Plot clustering uncertainty (and, if available, the similarity matrix)
 # plot(resIMIFA, plot.meth="zlabels", zlabels=olive$area)
 
+# Visualise the posterior predictive reconstruction error
+# plot(resIMIFA, plot.meth="errors", g=1)
+
+# Compare histograms of the data vs. replicate draw from the posterior for the 1st variable
+# plot(resIMIFA, plot.meth="errors", g=2, ind=1)
+
 # Visualise empirical vs. estimated covariance error metrics
-# plot(resIMIFA, plot.meth="errors")
+# plot(resIMIFA, plot.meth="errors", g=3)
 
 # Look at the trace, density, posterior mean and correlation of various parameters of interest
 # plot(resIMIFA, plot.meth="all", param="means", g=1)
@@ -109,7 +123,7 @@ Supplying the argument \code{zlabels} does \strong{not} have the same effect of 
 # plot(resIMIFA, plot.meth="all", param="alpha")
 }
 \references{
-Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
 }
 \seealso{
 \code{\link{mcmc_IMIFA}}, \code{\link{get_IMIFA_results}}, \code{\link{mat2cols}}, \code{\link{plot_cols}}

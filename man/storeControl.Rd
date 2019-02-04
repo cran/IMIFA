@@ -16,7 +16,9 @@ storeControl(mu.switch = TRUE,
 
 \item{score.switch}{Logical indicating whether the factor scores are to be stored.
 
-As the array containing each sampled scores matrix tends to be amongst the largest objects to be stored, this defaults to \code{FALSE} inside \code{\link{mcmc_IMIFA}} when \code{length(range.G) * length(range.Q) > 10}, otherwise the default is \code{TRUE}. For the "\code{MIFA}", "\code{OMIFA}", and "\code{IMIFA}" methods, setting this switch to \code{FALSE} also offers a slight speed-up.}
+As the array containing each sampled scores matrix tends to be amongst the largest objects to be stored, this defaults to \code{FALSE} inside \code{\link{mcmc_IMIFA}} when \code{length(range.G) * length(range.Q) > 10}, otherwise the default is \code{TRUE}. For the "\code{MIFA}", "\code{OMIFA}", and "\code{IMIFA}" methods, setting this switch to \code{FALSE} also offers a slight speed-up.
+
+Unlike other parameters, the scores need not be stored for posterior predictive checking (see Note below).}
 
 \item{load.switch}{Logical indicating whether the factor loadings are to be stored (defaults to \code{TRUE}).}
 
@@ -33,23 +35,26 @@ A named vector in which the names are the names of the storage switches and the 
 Supplies a list of values for logical switches indicating whether parameters of interest (means, scores, loadings, uniquenesses, and mixing proportions) should be stored when running models from the IMIFA family via \code{\link{mcmc_IMIFA}}. It may be useful not to store certain parameters if memory is an issue.
 }
 \details{
-\code{\link{storeControl}} is provided for assigning values for IMIFA models within \code{\link{mcmc_IMIFA}}. It may be useful not to store certain parameters if memory is an issue (e.g. for large data sets or for a large number of MCMC iterations after burnin and thinning). Warning: posterior inference and plotting won't be posssible for parameters not stored. In particular, when loadings and uniquenesses are not stored (or when means are not stored, for any of the mixture models), it will not be possible to estimate covariance matrices and compute error metrics. If loadings are not stored but scores are, caution is advised when examining posterior scores as Procrustes rotation will not occur within \code{\link{get_IMIFA_results}}.
+\code{\link{storeControl}} is provided for assigning values for IMIFA models within \code{\link{mcmc_IMIFA}}. It may be useful not to store certain parameters if memory is an issue (e.g. for large data sets or for a large number of MCMC iterations after burnin and thinning).
 }
 \note{
-Further warning messages may appear when \code{\link{mcmc_IMIFA}} is called depending on the particularities of the data set and the IMIFA method employed etc. as additional checks occur.
+Posterior inference and plotting won't be posssible for parameters not stored.
+
+Non-storage of parameters will almost surely prohibit the computation of posterior predictive checking error metrics within \code{\link{get_IMIFA_results}} also. In particular, if such error metrics are desired, \code{mu.switch} and \code{psi.switch} must be \code{TRUE} for all but the "\code{FA}" and "\code{IFA}" models, \code{load.switch} must be \code{TRUE} for all but the entirely zero-factor models, and \code{pi.switch} must be \code{TRUE} for models with clustering structure and unequal mixing proportions for all but the PPRE metric. \code{score.switch=TRUE} is not required for any posterior predictive checking.
+
+Finally, if loadings are not stored but scores are, caution is advised when examining posterior scores as Procrustes rotation will not occur within \code{\link{get_IMIFA_results}}.
 }
 \examples{
-storeControl(score.switch=FALSE)
+stctrl <- storeControl(score.switch=FALSE)
 
 # data(olive)
-# sim <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000,
-#                   storage=storeControl(score.switch=FALSE))
+# sim  <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000, storage=stctrl)
 
 # Alternatively specify these arguments directly
-# sim <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000, score.switch=FALSE)
+# sim  <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000, score.switch=FALSE)
 }
 \seealso{
-\code{\link{mcmc_IMIFA}}, \code{\link{get_IMIFA_results}}
+\code{\link{mcmc_IMIFA}}, \code{\link{get_IMIFA_results}}, \code{\link{mixfaControl}}, \code{\link{mgpControl}}, \code{\link{bnpControl}}
 }
 \author{
 Keefe Murphy - <\email{keefe.murphy@ucd.ie}>

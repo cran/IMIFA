@@ -4,7 +4,7 @@
 \alias{G_moments}
 \alias{G_expected}
 \alias{G_variance}
-\title{1st & 2nd Moments of the Dirichlet / Pitman-Yor Processes}
+\title{1st & 2nd Moments of the Pitman-Yor / Dirichlet Processes}
 \usage{
 G_expected(N,
            alpha,
@@ -25,13 +25,13 @@ G_variance(N,
 The expected number of clusters under the specified prior conditions, or the variance of the number of clusters.
 }
 \description{
-Calculates the \emph{a priori} expected number of clusters or the variance of the number of clusters under a Dirichlet process or Pitman-Yor process prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the Pitman-Yor \code{discount} parameter. Useful for soliciting sensible priors (or fixed values) for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}.
+Calculates the \emph{a priori} expected number of clusters or the variance of the number of clusters under a PYP or DP prior for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the Pitman-Yor \code{discount} parameter. Useful for soliciting sensible priors (or fixed values) for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}.
 }
 \details{
 All arguments are vectorised. Users can also consult \code{\link{G_priorDensity}} in order to solicit sensible priors.
 }
 \note{
-Requires use of the \code{Rmpfr} and \code{gmp} libraries for non-zero \code{discount} values.
+Requires use of the \code{\link[Rmpfr]{Rmpfr}} and \code{gmp} libraries for non-zero \code{discount} values.
 }
 \examples{
 G_expected(N=50, alpha=19.23356)
@@ -40,6 +40,14 @@ G_variance(N=50, alpha=19.23356)
 # require("Rmpfr")
 # G_expected(N=50, alpha=c(19.23356, 12.21619, 1), discount=c(0, 0.25, 0.7300045))
 # G_variance(N=50, alpha=c(19.23356, 12.21619, 1), discount=c(0, 0.25, 0.7300045))
+
+# Examine the growth rate of the DP
+DP   <- sapply(c(1, 5, 10), function(i) G_expected(1:200, alpha=i))
+matplot(DP, type="l", xlab="N", ylab="G")
+
+# Examine the growth rate of the PYP
+# PY <- sapply(c(0.1, 0.25, 0.5), function(i) G_expected(1:200, alpha=1, discount=i))
+# matplot(PY, type="l", xlab="N", ylab="G")
 }
 \seealso{
 \code{\link{G_priorDensity}}, \code{\link[Rmpfr]{Rmpfr}}

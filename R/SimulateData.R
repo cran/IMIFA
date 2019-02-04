@@ -1,20 +1,35 @@
 #' Simulate Data from a Mixture of Factor Analysers Structure
 #'
-#' Function to simulate data of any size and dimension from a mixture of (infinite) factor analysers structure.
+#' Functions to simulate data of any size and dimension from a (infinite) mixture of (infinite) factor analysers parameterisation or fitted object.
 #' @param N,G,P Desired overall number of observations, number of clusters, and number of variables in the simulated data set. All must be a single integer.
-#' @param Q Desired number of cluster-specific latent factors in the simulated data set. Can be specified either as a single integer if all clusters are to have the same number of factors, or a vector of length \code{G}. Defaults to \code{floor(log(P))} in each cluster.
+#' @param Q Desired number of cluster-specific latent factors in the simulated data set. Can be specified either as a single integer if all clusters are to have the same number of factors, or a vector of length \code{G}. Defaults to \code{floor(log(P))} in each cluster. Should be less than the associated \code{\link{Ledermann}} bound and the number of observations in the corresponding cluster. The argument \code{forceQ} can be used to enforce this upper limit.
 #' @param pis Mixing proportions of the clusters in the dataset if \code{G} > 1. Must sum to 1. Defaults to \code{rep(1/G, G)}.
-#' @param mu True values of the mean parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. If \code{mu} is missing, \code{loc.diff} is invoked to simulate distinct means for each cluster.
-#' @param psi True values of uniqueness parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. As such the user can specify uniquenesses as a diagonal or isotropic matrix, and further constrain uniquenesses across clusters if desired. If \code{psi} is missing, uniquenesses are simulated via \code{rgamma(P, 1, 1)} within each cluster.
+#' @param mu True values of the mean parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. If \code{mu} is missing, \code{loc.diff} is invoked to simulate distinct means for each cluster by default.
+#' @param psi True values of uniqueness parameters, either as a single value, a vector of length \code{G}, a vector of length \code{P}, or a \code{G * P} matrix. As such the user can specify uniquenesses as a diagonal or isotropic matrix, and further constrain uniquenesses across clusters if desired. If \code{psi} is missing, uniquenesses are simulated via \code{1/rgamma(P, 2, 1)} within each cluster by default.
+#' @param loadings True values of the loadings matrix/matrices. Must be supplied in the form of a list of numeric matrices when \code{G > 1}, otherwise a single matrix. Matrices must contain \code{P} rows and the number of columns must correspond to the values in \code{Q}. If \code{loadings} are not supplied, such matrices are populated with standard normal random variates by default (see \code{non.zero}).
+#' @param scores True values of the latent factor scores, as a \code{N * max(Q)} numeric matrix. If \code{scores} are not supplied, such a matrix is populated with standard normal random variates by default. Only relevant when \code{method="conditional"}.
 #' @param nn An alternative way to specify the size of each cluster, by giving the exact number of observations in each cluster explicitly. Must sum to \code{N}.
-#' @param loc.diff A parameter to control the closeness of the clusters in terms of the difference in their location vectors. Only relevant if \code{mu} is NOT supplied. Defaults to 1.
+#' @param loc.diff A parameter to control the closeness of the clusters in terms of the difference in their location vectors. Only relevant if \code{mu} is NOT supplied. Defaults to \code{2}.
+#'
+#' More specifically, \code{loc.diff} (if invoked) is invoked as follows: means are simulated with the vector of cluster-specific hypermeans given by \code{scale(1:G, center=TRUE, scale=FALSE) * loc.diff}.
+#' @param non.zero Controls the number of non-zero entries in each loadings column (per cluster) \strong{only} when \code{loadings} is not explicitly supplied. Values must be integers in the interval \code{[1,P]}. Defaults to \code{P}. The positions of the zeros are randomised, and non-zero entries are drawn from a standard normal.
+#'
+#' Must be given as a list of length \code{G} of vectors of length corresponding to \code{Q} when \code{G>1}. Can be given either as such a list or simply a vector of length \code{Q} when \code{G=1}. Alternatively, a single integer can be supplied, common across all loadings columns across all clusters. In any case, \code{non.zero} will be affected by \code{forceQ=TRUE} by default (see below).
+#' @param forceQ A logical indicating whether the upper limit on the number of cluster-specific factors \code{Q} is enforced. Defaults to \code{TRUE} for \code{sim_IMIFA_data}, but is always \code{FALSE} for \code{sim_IMIFA_model}. Note that when \code{forceQ=TRUE} is invoked, \code{non.zero} (see above) is also affected.
 #' @param method A switch indicating whether the mixture to be simulated from is the conditional distribution of the data given the latent variables (default), or simply the marginal distribution of the data.
+#' @param res An object of class "\code{Results_IMIFA}" generated by \code{\link{get_IMIFA_results}}.
 #'
 #' @return Invisibly returns a \code{data.frame} with \code{N} observations (rows) of \code{P} variables (columns). The true values of the parameters which generated these data are also stored as attributes.
+#' @details \code{sim_IMIFA_model} is a simple wrapper to \code{sim_IMIFA_data} which uses the estimated parameters of a fitted IMIFA related model, as generated by \code{\link{get_IMIFA_results}}. The necessary parameters must have been originally stored via \code{\link{storeControl}} in the creation of \code{res}.
+#' @note \code{N}, \code{G}, \code{P} & \code{Q} will \strong{NOT} be inferred from the supplied parameters \code{pis}, \code{mu}, \code{psi}, \code{loadings}, \code{scores} & \code{nn} - rather, the parameters' length/dimensions must adhere to the supplied values of \code{N}, \code{G}, \code{P} & \code{Q}.
+#'
+#' Missing values are not allowed in any of \code{pis}, \code{mu}, \code{psi}, \code{loadings}, \code{scores} & \code{nn}.
 #' @export
-#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2017) Infinite Mixtures of Infinite Factor Analysers: Nonparametric Model-Based Clustering via Latent Gaussian Models, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
 #' @keywords utility
 #' @importFrom Rfast "is.symmetric"
+#' @name sim_IMIFA
+#' @rdname sim_IMIFA
 #'
 #' @author Keefe Murphy - <\email{keefe.murphy@@ucd.ie}>
 #' @usage
@@ -25,8 +40,12 @@
 #'                pis = rep(1/G, G),
 #'                mu = NULL,
 #'                psi = NULL,
+#'                loadings = NULL,
+#'                scores = NULL,
 #'                nn = NULL,
-#'                loc.diff = 1L,
+#'                loc.diff = 2,
+#'                non.zero = P,
+#'                forceQ = TRUE,
 #'                method = c("conditional", "marginal"))
 #' @examples
 #' # Simulate 100 observations from 3 balanced clusters with cluster-specific numbers of latent factors
@@ -40,25 +59,30 @@
 #' # Visualise the data in two-dimensions
 #' plot(cmdscale(dist(sim_data), k=2), col=labels)
 #'
+#' # Examine the overlap with a pairs plot of 5 randomly chosen variables
+#' pairs(sim_data[,sample(1:20, 5)], col=labels)
+#'
 #' # Fit a MIFA model to this data
 #' # tmp    <- mcmc_IMIFA(sim_data, method="MIFA", range.G=3, n.iters=5000)
 #' @seealso \code{\link{mcmc_IMIFA}} for fitting an IMIFA related model to the simulated data set.
-sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G), pis = rep(1/G, G), mu = NULL,
-                           psi = NULL, nn = NULL, loc.diff = 1L, method = c("conditional", "marginal")) {
+#'
+#' \code{\link{get_IMIFA_results}} for generating input for \code{sim_IMIFA_model}.
+#'
+#' \code{\link{Ledermann}} for details on the upper-bound for \code{Q}. Note that this function accounts for isotropic uniquenesses, if \code{psi} is supplied in that manner, in computing this bound.
+sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G), pis = rep(1/G, G), mu = NULL, psi = NULL, loadings = NULL,
+                           scores = NULL, nn = NULL, loc.diff = 2, non.zero = P, forceQ = TRUE, method = c("conditional", "marginal")) {
 
-  N            <- as.integer(N)
-  G            <- as.integer(G)
-  P            <- as.integer(P)
-  Q            <- as.integer(Q)
-  Q.warn       <- min(N - 1, Ledermann(P))
-  if(any(N  < 0, P  < 0, Q < 0, G  <= 0)) stop("'N', 'P', and 'Q' must be strictly non-negative and 'G' must be strictly positive", call.=FALSE)
+  N            <- unname(as.integer(N))
+  G            <- unname(as.integer(G))
+  P            <- unname(as.integer(P))
+  Q            <- unname(as.integer(Q))
+  if(any(N  < 0, P  < 0, Q < 0, G  <= 0)) stop("'N', 'P', and 'Q' must be strictly non-negative and 'G' must be strictly positive",     call.=FALSE)
   if(any(length(N) != 1, length(loc.diff) != 1,
          length(G) != 1, length(P) != 1)) stop("'N', 'P', 'G', and 'loc.diff' must be of length 1", call.=FALSE)
-  if(any(N  < 2, N <= G))                 stop("Must simulate more than one data-point and the number of clusters cannot exceed N", call.=FALSE)
-  if(any(Q  > Q.warn))                    warning(paste0("Are you sure you want to generate this many factors relative to N=", N, " and P=", P, "?\nSuggested upper-bound = ", Q.warn), call.=FALSE)
-  if(length(Q) != G) {
-    if(!missing(Q))  {
-      if(length(Q) == 1) {
+  if(any(N  < 2, N <= G))                 stop("Must simulate more than one data-point and the number of clusters must be less than N", call.=FALSE)
+  if(length(Q) != G)      {
+    if(!missing(Q))       {
+      if(length(Q) == 1)  {
         Q      <- rep(Q, G)
       } else if(length(Q != G))           stop(paste0("'Q' must supplied for each of the G=", G, " clusters"), call.=FALSE)
     }
@@ -71,63 +95,138 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
   nnames       <- paste0("Obs ", Nseq)
   vnames       <- paste0("Var ", Pseq)
 
-  if(!missing(nn) && missing(pis))     {
+  if(!missing(nn) && missing(pis))    {
     nn         <- as.integer(nn)
     if(!is.integer(nn)   ||
+       anyNA(nn)  ||
        any(length(nn)    != G,
-           sum(nn)       != N))           stop(paste0("'nn' must be an integer vector of length G=", G, " which sums to N=", N), call.=FALSE)
+           sum(nn)       != N))           stop(paste0("'nn' must be an integer vector of length G=", G, " which sums to N=", N, " without missing values"), call.=FALSE)
     if(any(nn  <= 0))                     stop("All 'nn' values must be strictly positive; simulating empty clusters not allowed", call.=FALSE)
   } else {
     if(!is.numeric(pis)  ||
+       anyNA(pis) ||
        any(length(pis)   != G,
-           sum(pis)      != 1))           stop(paste0("'pis' must be a numeric vector of length G=", G, " which sums to ", 1), call.=FALSE)
+           !all.equal(sum(pis), 1)))      stop(paste0("'pis' must be a numeric vector of length G=", G, " which sums to ", 1, " without missing values"),   call.=FALSE)
     if(any(pis <= 0))                     stop("All 'pis' values must be strictly positive", call.=FALSE)
-    nn         <- vector("numeric", G)
-    iter       <- 0
-    while(any(nn   < floor(N/(G * G)),
-              iter < 1000))            {
+    nn         <- vector("integer", G)
+    iter       <- 0L
+    nn0        <- TRUE
+    while(nn0  && iter    < 100)      {
       labs     <- .sim_z_p(N=N, prob.z=pis)
       nn       <- tabulate(labs, nbins=G)
-      iter     <- iter    + 1
+      iter     <- iter    + 1L
+      nn0      <- any(nn <= 0)
     }
+    if(nn0)                               stop("Simulating empty clusters not allowed; try supplying 'nn' directly instead of small 'pis'", call.=FALSE)
   }
 
-  mu.miss      <- missing(mu)
-  if(!mu.miss)  {
-    musup      <- matrix(.len_check(as.matrix(mu),  switch0g = TRUE, method = ifelse(G > 1, "MFA", "FA"), P, G)[[1]], nrow=P, ncol=G, byrow=length(mu)  == G)
+  if(!(mumiss  <- missing(mu)))       {
+    musup      <- matrix(.len_check(as.matrix(mu),  switch0g = TRUE, method = ifelse(G > 1, "MFA", "FA"), P, G)[[1L]], nrow=P, ncol=G, byrow=length(mu)  == G)
+    if(anyNA(musup))                      stop("Missing values are not allowed in 'mu'",  call.=FALSE)
   } else {
     if(!is.numeric(loc.diff))             stop("'loc.diff' must be numeric", call.=FALSE)
     musup      <- as.integer(scale(Gseq, center=TRUE, scale=FALSE)) * loc.diff
   }
-  psi.miss     <- missing(psi)
-  if(!psi.miss) {
-    psisup     <- matrix(.len_check(as.matrix(psi), switch0g = TRUE, method = ifelse(G > 1, "MFA", "FA"), P, G)[[1]], nrow=P, ncol=G, byrow=length(psi) == G)
+  if(!(psimiss <- missing(psi)))      {
+    psisup     <- matrix(.len_check(as.matrix(psi), switch0g = TRUE, method = ifelse(G > 1, "MFA", "FA"), P, G)[[1L]], nrow=P, ncol=G, byrow=length(psi) == G)
+    if(anyNA(psisup))                     stop("Missing values are not allowed in 'psi'", call.=FALSE)
   }
-  simdata      <- base::matrix(0, nrow=0, ncol=P)
+  if(!(smiss   <- missing(scores))   &&
+     method    == "conditional")      {
+    if(!is.matrix(scores)  ||
+       !is.numeric(scores))               stop("Invalid 'scores' supplied: must be a numeric matrix", call.=FALSE)
+    if(anyNA(scores))                     stop("Missing values are not allowed in 'scores'", call.=FALSE)
+  }
+  Q.warn       <- pmin(nn - 1L, Ledermann(P, isotropic=!psimiss && length(unique(psisup[,1L])) == 1))
+  if(any(Q.ind <- Q > Q.warn))        {
+    if(length(forceQ)   != 1 ||
+       !is.logical(forceQ))               stop("'forceQ' must be a single logical indicator", call.=FALSE)
+    warn.Q     <- paste0("Too many factors generated relative to P=", P, " and the number of observations in cluster", ifelse(sum(Q.ind) > 1, "s ", " "), paste(which(Q.ind), paste0("(", nn[Q.ind], ")"), collapse=", "))
+    if(isTRUE(forceQ))   {                warning(paste0(warn.Q, "\nEnforced the corresponding upper-bound", ifelse(sum(Q.ind) > 1, "s ", " "), "{", paste(Q.warn[Q.ind], collapse=", "), "}\n"), call.=FALSE, immediate.=TRUE)
+      Q[Q.ind] <- Q.warn[Q.ind]
+    } else                                warning(paste0(warn.Q, "\nConsider setting 'forceQ' to 'TRUE'"), call.=FALSE, immediate.=TRUE)
+  }
+  if(!(lammiss <- is.null(loadings))) {
+    lmat       <- loadings
+    if(anyNA(lmat))                       stop("Missing values are not allowed in 'loadings'", call.=FALSE)
+    if(G == 1)  {
+      lmat     <- base::matrix(unlist(lmat), nrow=P, ncol=Q)
+      if(!is.matrix(lmat)  ||
+         !is.numeric(lmat))               stop("Invalid 'loadings' supplied: must be a numeric matrix when G=1", call.=FALSE)
+      if(nrow(lmat)   != P ||
+         ncol(lmat)   != Q)               stop(paste0("The 'loadings' matrix must have P=", P, " rows and Q=", Q, " columns, when G=1"), call.=FALSE)
+      lmat     <- list(lmat)
+    } else      {
+      if(!is.list(lmat)    ||
+         length(lmat) != G)               stop(paste0("'loadings' must be a list of length G=", G, " when G > 1"), call.=FALSE)
+      if(any(vapply(lmat, function(x)
+        !is.matrix(x) ||
+        !is.numeric(x), logical(1L))))    stop("All elements in the 'loadings' list must be numeric matrices", call.=FALSE)
+      Px       <- as.integer(unname(vapply(lmat, nrow, numeric(1L))))
+      Qx       <- as.integer(unname(vapply(lmat, ncol, numeric(1L))))
+      if((length(unique(Px)) != 1 ||
+         P     != Px[1L])    ||
+         sum(Q  - Qx) != 0)               stop(paste0("All 'loadings' matrices must have P=", P, " rows and the number of columns in each must correspond to Q"), call.=FALSE)
+    }
+  }
+  if(!(nzmiss  <- missing(non.zero))) {
+    if(length(non.zero)      == 1 &&
+       is.numeric(non.zero))  {
+      non.zero <- lapply(Gseq, function(g) rep(non.zero, Q[g]))
+    } else if((G > 1  &&
+      (!is.list(non.zero)    ||
+       length(non.zero)      != G))  ||
+      (G == 1  &&
+      (is.list(non.zero)     &&
+       length(non.zero)      != 1)))  {   stop(paste0("'non.zero' must be a list of length G=", G), call.=FALSE)
+    } else non.zero   <- if(all(G == 1, length(non.zero) > 1)) list(non.zero) else as.list(non.zero)
+    if(forceQ && any(Q.ind))  {           message("Also forcing 'non-zero' to conform to 'Q'...\n")
+      non.zero <- lapply(Gseq, function(g, ng=non.zero[[g]]) ng[seq_len(pmin(length(ng), Q.warn[g]))])
+    }
+    non.zero   <- lapply(non.zero, function(x) if(!is.null(x) && (length(x) > 1 || x != 0)) x)
+    if(!identical(Q, lengths(non.zero)))  stop(paste0("The length of each element of 'non.zero' must correspond to Q={", paste(Q, collapse=", "), "}"), call.=FALSE)
+    nztest     <- unlist(non.zero)
+    if(!is.numeric(nztest) ||
+       anyNA(nztest)       ||
+       any(nztest < 1       |
+           nztest > P)     ||
+       nztest  != floor(nztest))          stop(paste0("Every entry of 'non.zero' must be a strictly positive integer, less than or equal to P=", P), call.=FALSE)
+  }
+  simdata      <- base::matrix(0L, nrow=0L, ncol=P)
   true.mu      <- true.l   <-
   true.psi     <- true.cov <- stats::setNames(vector("list", G), paste0("Cluster", Gseq))
   sq_mat       <- if(P > 50)  function(x) diag(sqrt(diag(x))) else sqrt
 
 # Simulate true parameter values
   true.zlab    <- factor(rep(Gseq, nn), labels=Gseq)
-  if(method    == "conditional") {
+  if(method    == "conditional")   {
     Q.max      <- max(Q)
-    eta.true   <- .sim_eta_p(Q=Q.max, N=N)
-  }
-  for(g in Gseq) {
+    eta.true   <- if(smiss) .sim_eta_p(Q=Q.max, N=N) else scores
+    if(nrow(eta.true) != N ||
+       ncol(eta.true) != Q.max)           stop(paste0("The 'scores' matrix must have N=", N, " rows and max(Q)=", Q.max, " columns"), call.=FALSE)
+  } else if(!smiss)                       message("True 'scores' need not be supplied when 'method=\"marginal\"'\n")
+  for(g in Gseq)       {
     Q.g        <- Q[g]
     N.g        <- nn[g]
-    mu.true    <- stats::setNames(if(mu.miss) .sim_mu_p(P=P, mu.zero=musup[g], sig.mu.sqrt=1) else musup[,g], vnames)
-    l.true     <- matrix(.sim_load_p(Q=Q.g, P=P, sigma.l=1), nrow=P, ncol=Q.g)
-    psi.true   <- stats::setNames(if(psi.miss) stats::rgamma(P, 2, 1) else psisup[,g], vnames)
+    mu.true    <- stats::setNames(if(mumiss) .sim_mu_p(P=P, mu.zero=musup[g], sig.mu.sqrt=1)     else musup[,g],  vnames)
+    if(lammiss && !nzmiss)   {
+      neff     <- non.zero[[g]]
+      l.true   <- base::matrix(0L, nrow=P, ncol=Q.g)
+      for(k in seq_len(Q.g)) {
+        lind   <- sample(Pseq, neff[k], replace=FALSE)
+        l.true[lind,k] <- .sim_load_p(Q=1L, P=neff[k], sigma.l=1)
+      }
+    } else      {
+      l.true   <- if(lammiss) base::matrix(.sim_load_p(Q=Q.g, P=P, sigma.l=1), nrow=P, ncol=Q.g) else lmat[[g]]
+    }
+    psi.true   <- stats::setNames(if(psimiss) 1/stats::rgamma(P, shape=2, rate=1)                else psisup[,g], vnames)
 
   # Simulate data
-    covmat     <- provideDimnames({ if(P > 1) diag(psi.true) else as.matrix(psi.true) } + { if(Q.g > 0) switch(method, marginal=tcrossprod(l.true), 0) else 0}, base=list(vnames))
+    covmat     <- provideDimnames({ if(P > 1) diag(psi.true) else as.matrix(psi.true) } + { if(Q.g > 0) switch(EXPR=method, marginal=tcrossprod(l.true), 0L) else 0L}, base=list(vnames))
     if(!all(is.symmetric(covmat),
-            is.double(covmat)))           stop("Invalid covariance matrix!", call.=FALSE)
-    covmat     <- is.posi_def(covmat, make=TRUE)$X.new
-    sigma      <- if(all(Q.g > 0, P > 1, method == "marginal")) .chol(covmat) else sq_mat(covmat)
-    means      <- matrix(mu.true, nrow=N.g, ncol=P, byrow=TRUE) + switch(method, conditional=tcrossprod(eta.true[true.zlab == g, seq_len(Q.g), drop=FALSE], l.true), 0)
+            is.numeric(covmat)))          stop("Invalid covariance matrix!", call.=FALSE)
+    sigma      <- if(all(Q.g > 0, P > 1, method == "marginal")) .chol(is.posi_def(covmat, make=TRUE)$X.new) else sq_mat(covmat)
+    means      <- matrix(mu.true, nrow=N.g, ncol=P, byrow=TRUE) + switch(EXPR=method, conditional=tcrossprod(eta.true[true.zlab == g, seq_len(Q.g), drop=FALSE], l.true), 0L)
     simdata    <- rbind(simdata, means + matrnorm(N.g, P) %*% sigma)
     dimnames(l.true)   <- list(vnames, if(Q.g > 0) paste0("Factor ", seq_len(Q.g)))
     true.mu[[g]]       <- mu.true
@@ -157,7 +256,9 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
   attr(simdata,
        "Loadings")     <- true.l
   attr(simdata,
-       "Loc.Diff")     <- if(mu.miss) loc.diff
+       "Loc.Diff")     <- if(mumiss) loc.diff
+  attr(simdata,
+       "Method")       <- method
   attr(simdata,
        "Uniquenesses") <- do.call(cbind, true.psi)
   attr(simdata,
@@ -165,7 +266,45 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
   attr(simdata,
        "Proportions")  <- pis
   attr(simdata,
+       "Sizes")        <- nn
+  attr(simdata,
        "Covariance")   <- true.cov
   class(simdata)       <- c("data.frame")
     invisible(simdata)
 }
+
+#' @keywords utility
+#' @rdname sim_IMIFA
+#' @export
+#' @usage
+#' sim_IMIFA_model(res,
+#'                 method = c("conditional", "marginal"))
+  sim_IMIFA_model      <- function(res, method = c("conditional", "marginal")) {
+    UseMethod("sim_IMIFA_model")
+  }
+
+#' @export
+  sim_IMIFA_model.Results_IMIFA   <-      function(res, method = c("conditional", "marginal")) {
+    if(!all(is.character(method)))        stop("'method' must be a character vector of length 1", call.=FALSE)
+    G1         <- res$GQ.results$G > 1
+    switches   <- attr(res, "Switch")[c(2L:1L, 3L:(4L + G1))]
+    switch(EXPR=(meth  <- match.arg(method)),
+           conditional= {
+             if(!all(switches))           stop(paste0("Need means, loadings, uniquenesses, ", ifelse(G1, "scores, and mixing proportions", "and scores"), " to have been stored for the '", meth, "' method"), call.=FALSE)
+           },
+           marginal=    {
+             if(!all(switches[-1L]))      stop(paste0("Need means, loadings, uniquenesses, ", ifelse(G1, "and mixing proportions", ""), " to have been stored for the '", meth, "' method"), call.=FALSE)
+           })
+    suppressMessages(suppressWarnings(
+      sim_IMIFA_data(N        = attr(res, "Obs"),
+                     G        = res$GQ.results$G,
+                     P        = attr(res, "Vars"),
+                     Q        = res$GQ.results$Q,
+                     pis      = res$Clust$post.pi,
+                     mu       = res$Means$post.mu,
+                     psi      = res$Uniquenesses$post.psi,
+                     loadings = res$Loadings$post.load,
+                     scores   = res$Scores$post.eta,
+                     method   = meth,
+                     forceQ   = FALSE)))
+  }

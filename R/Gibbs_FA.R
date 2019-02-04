@@ -39,46 +39,32 @@
     ll.store     <- vector("integer", n.store)
 
     mu.sigma     <- 1/sigma.mu
-    uni.type     <- switch(uni.type,   unconstrained=,               constrained="constrained", "single")
-    .sim_psi_inv <- switch(uni.type,   constrained=.sim_psi_u1,      single=.sim_psi_c1)
-    .sim_psi_ip  <- switch(uni.prior,  unconstrained=.sim_psi_ipu,   isotropic=.sim_psi_ipc)
-    psi.beta     <- switch(uni.prior,  isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
-    uni.shape    <- switch(uni.type,   constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
-    V            <- switch(uni.type,   constrained=P,                single=1)
+    mu.zero      <- as.numeric(mu.zero)
+    uni.type     <- switch(EXPR=uni.type,  unconstrained=,               constrained="constrained", "single")
+    .sim_psi_inv <- switch(EXPR=uni.type,  constrained=.sim_psi_u1,      single=.sim_psi_c1)
+    .sim_psi_ip  <- switch(EXPR=uni.prior, unconstrained=.sim_psi_ipu,   isotropic=.sim_psi_ipc)
+    psi.beta     <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
+    uni.shape    <- switch(EXPR=uni.type,  constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
+    V            <- switch(EXPR=uni.type,  constrained=P,                single=1L)
     eta          <- .sim_eta_p(Q=Q, N=N)
     lmat         <- matrix(.sim_load_p(Q=Q, P=P, sigma.l=sigma.l), nrow=P, ncol=Q)
     psi.inv      <- .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta)
-    if(Q0 &&   Q  < min(N - 1, Ledermann(P))) {
-      fact       <- try(stats::factanal(data, factors=Q, scores="regression", control=list(nstart=50)), silent=TRUE)
-      if(!inherits(fact, "try-error")) {
-        eta      <- fact$scores
-        lmat     <- unclass(fact$loadings)
-        psi.inv  <- 1/fact$uniquenesses
-      }
-    } else {
-      psi.tmp    <- psi.inv
-      psi.inv[]  <- 1/switch(uni.type, constrained=.col_vars(data, suma=mu), exp(mean(log(.col_vars(data, suma=mu)))))
-      inf.ind    <- is.infinite(psi.inv)
-      psi.inv[inf.ind]     <- psi.tmp[inf.ind]
-    }
+    psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=.col_vars(data, avg=mu), max(.col_vars(data, avg=mu)))
+    max.p        <- (psi.alpha  - 1)/psi.beta
+    inf.ind      <- psi.inv > max(max.p)
+    psi.inv[inf.ind]       <- switch(EXPR=uni.type, constrained=max.p, rep(max.p, P))[inf.ind]
+    rm(max.p, inf.ind)
     l.sigma      <- diag(1/sigma.l, Q)
     sum.data     <- mu * N
-    if(burnin     < 1)    {
-      mu.store[,1]         <- mu
-      eta.store[,,1]       <- eta
-      load.store[,,1]      <- lmat
-      psi.store[,1]        <- 1/psi.inv
-      ll.store[1]          <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + diag(1/psi.inv), log=TRUE))
-    }
     init.time    <- proc.time() - start.time
 
   # Iterate
-    for(iter in seq_len(total)[-1]) {
+    for(iter in seq_len(total)) {
       if(verbose && iter    < burnin) utils::setTxtProgressBar(pb, iter)
       storage    <- is.element(iter,  iters)
 
     # Scores & Loadings
-      c.data     <- sweep(data, 2, mu, FUN="-", check.margin=FALSE)
+      c.data     <- sweep(data, 2L, mu, FUN="-", check.margin=FALSE)
       if(Q0) {
         eta      <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1)
         lmat     <- matrix(vapply(Pseq, function(j) .sim_load(l.sigma=l.sigma, Q=Q, c.data=c.data[,j], Q1=Q1,
@@ -98,11 +84,11 @@
         psi      <- 1/psi.inv
         post.mu  <- post.mu + mu/n.store
         post.psi <- post.psi + psi/n.store
-        if(sw["mu.sw"])          mu.store[,new.it]      <- mu
-        if(all(sw["s.sw"], Q0))  eta.store[,,new.it]    <- eta
+        if(sw["mu.sw"])             mu.store[,new.it]   <- mu
+        if(all(sw["s.sw"], Q0))   eta.store[,,new.it]   <- eta
         if(all(sw["l.sw"], Q0))  load.store[,,new.it]   <- lmat
-        if(sw["psi.sw"])         psi.store[,new.it]     <- psi
-                                 ll.store[new.it]       <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + if(uni) psi else diag(psi), log=TRUE))
+        if(sw["psi.sw"])           psi.store[,new.it]   <- psi
+                                     ll.store[new.it]   <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + if(uni) psi else diag(psi), log=TRUE))
       }
     }
     if(verbose)  close(pb)
@@ -114,6 +100,6 @@
                       post.psi = tryCatch(stats::setNames(post.psi, varnames),            error=function(e) post.psi),
                       ll.store = ll.store,
                       time     = init.time)
-    attr(returns, "K")        <- PGMM_dfree(Q=Q, P=P, method=switch(uni.type, constrained="UCU", single="UCC"))
-    return(returns)
+    attr(returns, "K")        <- PGMM_dfree(Q=Q, P=P, method=switch(EXPR=uni.type, constrained="UCU", single="UCC"))
+      return(returns)
   }
