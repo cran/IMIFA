@@ -16,7 +16,9 @@
 #' @param G.meth If the object in \code{sims} arises from the "\code{OMFA}", "\code{OMIFA}", "\code{IMFA}" or "\code{IMIFA}" methods, this argument determines whether the optimal number of clusters is given by the mode or median of the posterior distribution of \code{G}. Defaults to "\code{mode}". Often the mode and median will agree in any case.
 #' @param Q.meth If the object in \code{sims} arises from the "\code{IFA}", "\code{MIFA}", "\code{OMIFA}" or "\code{IMIFA}" methods, this argument determines whether the optimal number of latent factors is given by the mode or median of the posterior distribution of \code{Q}. Defaults to "\code{mode}". Often the mode and median will agree in any case.
 #' @param conf.level The confidence level to be used throughout for credible intervals for all parameters of inferential interest, and error metrics if \code{error.metrics=TRUE}. Defaults to \code{0.95}.
-#' @param error.metrics A logical activating or deactivating posterior predictive checking: i.e. controlling whether metrics quantifying a) the posterior predictive reconstruction error (PPRE) between bin counts of the data and bin counts of replicate draws from the posterior distribution & and b) the error between the empirical and estimated covariance matrices should be computed. These are computed for every \emph{valid} retained iteration (see \code{Details}). Defaults to \code{TRUE}, but can be time-consuming for models which achieve clustering. These error metrics, and the uncertainty associated with them can be visualised via \code{\link{plot.Results_IMIFA}}.
+#' @param error.metrics A logical activating or deactivating posterior predictive checking: i.e. controlling whether metrics quantifying a) the posterior predictive reconstruction error (PPRE) between bin counts of the data and bin counts of replicate draws from the posterior distribution & and b) the error between the empirical and estimated covariance matrices should be computed. These are computed for every \emph{valid} retained iteration (see \code{Details}). Defaults to \code{TRUE}, but can be time-consuming for models which achieve clustering. These error metrics, and the uncertainty associated with them can be visualised via \code{\link{plot.Results_IMIFA}}. Depending on what parameters were stored when calling \code{\link{mcmc_IMIFA}}, potentially not all error metrics will be available to compute.
+#'
+#' The Frobenius norm is used in the computation of the PPRE, by default, but the \code{type} of norm can be changed via the \code{...} construct below. So too can the breakpoints (\code{dbreaks}) used to bin the data and the posterior predictive replicate data sets. Some caution is advised in the latter case.
 #' @param vari.rot Logical indicating whether the loadings matrix/matrices template(s) should be \code{\link[stats]{varimax}} rotated first, prior to the Procrustes rotation steps. Defaults to \code{FALSE}. Not necessary at all for clustering purposes, or inference on the covariance matrix, but useful if interpretable inferences on the loadings matrix/matrices are desired. Arguments to \code{\link[stats]{varimax}} can be passed via the \code{...} construct, but note that the argument \code{normalize} here defaults to \code{FALSE}.
 #' @param z.avgsim Logical (defaults to \code{FALSE}) indicating whether the clustering should also be summarised with a call to \code{\link{Zsimilarity}} by the clustering with minimum mean squared error to the similarity matrix obtained by averaging the stored adjacency matrices, in addition to the MAP estimate.
 #'
@@ -24,8 +26,12 @@
 #'
 #' Please be warned that this feature requires loading the \code{\link[mcclust]{mcclust}} package. This is liable to take considerable time to compute, and may not even be possible if the number of observations &/or number of stored iterations is large and the resulting matrix isn't sufficiently sparse. When \code{z.avgsim=TRUE}, both the summarised clustering and the similarity matrix are stored: the latter can be visualised as part of a call to \code{\link{plot.Results_IMIFA}}.
 #' @param zlabels For any method that performs clustering, the true labels can be supplied if they are known in order to compute clustering performance metrics. This also has the effect of ordering the MAP labels (and thus the ordering of cluster-specific parameters) to most closely correspond to the true labels if supplied.
-#' @param nonempty For "\code{MFA}" and "\code{MIFA}" models ONLY: a logical indicating whether only iterations with non-empty components should be retained. Defaults to \code{TRUE}, but may lead to empty chains - conversely, \code{FALSE} may lead to empty components.
-#' @param x,object,... Arguments required for the \code{print.Results_IMIFA} and \code{summary.Results_IMIFA} functions: \code{x} and \code{object} are objects of class \code{"Results_IMIFA"} resulting from a call to \code{\link{get_IMIFA_results}}, while \code{...} gathers additional arguments to those functions. The \code{...} construct also allows arguments to \code{\link[stats]{varimax}} to be passed to \code{\link{get_IMIFA_results}} itself, when \code{isTRUE(vari.rot)}, or arguments to \code{\link[graphics]{hist}} when \code{isTRUE(error.metrics)}, in order to guide construction of the bins.
+#' @param nonempty For "\code{MFA}" and "\code{MIFA}" models ONLY: a logical indicating whether only iterations with non-empty components should be retained. Defaults to \code{TRUE}, but may lead to empty chains - conversely, \code{FALSE} may lead to empty components and related errors.
+#' @param x,object,... Arguments required for the \code{print.Results_IMIFA} and \code{summary.Results_IMIFA} functions: \code{x} and \code{object} are objects of class \code{"Results_IMIFA"} resulting from a call to \code{\link{get_IMIFA_results}}, while \code{...} gathers additional arguments to those functions.
+#'
+#' Users can also pass the \code{type} argument to the \code{\link{norm}} function when \code{isTRUE(error.metrics)} and the posterior predictive reconstruction error (PPRE) is calculated. By default the Frobenius norm (\code{type="F"}) is employed.
+#'
+#' Finally, the \code{...} construct also allows arguments to \code{\link[stats]{varimax}} to be passed to \code{\link{get_IMIFA_results}} itself, when \code{isTRUE(vari.rot)}, or arguments to \code{\link[graphics]{hist}} when \code{isTRUE(error.metrics)}, in order to guide construction of the bins. Additionally, by passing the argument \code{dbreaks} via the \code{...} construct, the bins can be specified directly. However, caution is advised in doing so; in particular, the bins must be constructed on data which has been standardised in the same way as the data modelled within \code{\link{mcmc_IMIFA}}.
 #'
 #' @details The function also performs post-hoc corrections for label switching, as well as post-hoc Procrustes rotation of loadings matrices and scores, in order to ensure sensible posterior parameter estimates, computes error metrics, constructs credible intervals, and generally transforms the raw \code{sims} object into an object of class "\code{Results_IMIFA}" in order to prepare the results for plotting via \code{\link{plot.Results_IMIFA}}.
 #'
@@ -54,13 +60,13 @@
 #' @keywords IMIFA main
 #' @include MainFunction.R
 #' @export
-#' @importFrom Rfast "colMaxs" "colTabulate" "med" "rowAll" "rowMaxs" "rowmeans" "rowOrder" "rowTabulate" "sort_mat" "Var"
+#' @importFrom Rfast "colMaxs" "colTabulate" "med" "rowAll" "rowMaxs" "rowOrder" "rowSort" "rowTabulate" "Var"
 #' @importFrom mclust "classError"
-#' @importFrom matrixStats "colSums2" "rowMedians" "rowQuantiles" "rowSums2"
+#' @importFrom matrixStats "colSums2" "rowMeans2" "rowMedians" "rowQuantiles" "rowSums2"
 #' @importFrom slam "as.simple_triplet_matrix"
 #'
 #' @seealso \code{\link{plot.Results_IMIFA}}, \code{\link{mcmc_IMIFA}}, \code{\link{Zsimilarity}}, \code{\link{scores_MAP}}, \code{\link{sim_IMIFA_model}}, \code{\link{Procrustes}}
-#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+#' @references Murphy, K., Viroli, C., and Gormley, I. C. (2019) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 1-27. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
 #'
 #' @author Keefe Murphy - <\email{keefe.murphy@@ucd.ie}>
 #' @usage
@@ -80,7 +86,7 @@
 #'                   nonempty = TRUE,
 #'                   ...)
 #' @examples
-#' # data(coffee)
+#' \donttest{# data(coffee)
 #' # data(olive)
 #'
 #' # Run a MFA model on the coffee data over a range of clusters and factors.
@@ -103,12 +109,13 @@
 #' # summary(resIMIFAolive)
 #'
 #' # Simulate new data from the above model
-#' # newdata       <- sim_IMIFA_model(resIMIFAolive)
+#' # newdata       <- sim_IMIFA_model(resIMIFAolive)}
 get_IMIFA_results              <- function(sims = NULL, burnin = 0L, thinning = 1L, G = NULL, Q = NULL, criterion = c("bicm", "aicm", "dic", "bic.mcmc", "aic.mcmc"), G.meth = c("mode", "median"),
                                            Q.meth = c("mode", "median"), conf.level = 0.95, error.metrics = TRUE, vari.rot = FALSE, z.avgsim = FALSE, zlabels = NULL, nonempty = TRUE, ...) {
-  UseMethod("get_IMIFA_results")
+    UseMethod("get_IMIFA_results")
 }
 
+#' @method get_IMIFA_results IMIFA
 #' @export
 get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 1L, G = NULL, Q = NULL, criterion = c("bicm", "aicm", "dic", "bic.mcmc", "aic.mcmc"), G.meth = c("mode", "median"),
                                            Q.meth = c("mode", "median"), conf.level = 0.95, error.metrics = TRUE, vari.rot = FALSE, z.avgsim = FALSE, zlabels = NULL, nonempty = TRUE, ...) {
@@ -154,6 +161,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   cov.emp        <- attr(sims, "Cov.Emp")
   cov.range      <- ifelse(uni, 1L, max(cov.emp) - min(cov.emp))
   cshrink        <- attr(sims, "C.Shrink")
+ #gshrink        <- attr(sims, "G.Shrink") # vignette file will need this attribute
   if(any(length(conf.level) != 1,
      !is.numeric(conf.level),
      (conf.level <= 0   ||
@@ -393,6 +401,9 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       if(cshrink <- cshrink && ((method != "MIFA") || G > 1)) {
         sigmas   <- sims[[G.ind]][[Q.ind]]$sigma[,tmp.store,   drop=FALSE]
       }
+     #if(gshrink) {
+     #  SIGMAS   <- sims[[G.ind]][[Q.ind]]$SIGMA[tmp.store]
+     #}
     }
 
 # Manage Label Switching & retrieve cluster labels/mixing proportions
@@ -500,7 +511,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       var.pi     <- stats::setNames(.row_vars(pi.prop),     gnames)
       ci.pi      <- rowQuantiles(pi.prop, probs=conf.levels)
       ci.pi      <- if(G == 1) t(ci.pi) else ci.pi
-      post.pi    <- stats::setNames(rowmeans(pi.prop),      gnames)
+      post.pi    <- stats::setNames(rowMeans2(pi.prop),     gnames)
     } else if(equal.pro)  {
       post.pi    <- stats::setNames(rep(1/G, G),            gnames)
     } else          {             message("Mixing proportions not stored: estimating posterior mean by the proportions of the MAP clustering\n")
@@ -607,7 +618,10 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   }
 
   leder.b        <- min(n.obs - 1L, Ledermann(n.var, isotropic=is.element(uni.type, c("isotropic", "single"))))
-  if(any(unlist(Q) > leder.b))    warning(paste0("Estimate of Q", ifelse(G > 1, " in one or more clusters ", " "), "is greater than ", ifelse(any(unlist(Q) > n.var), paste0("the number of variables (", n.var, ")"), paste0("the suggested Ledermann upper bound (", leder.b, ")\n"))), call.=FALSE)
+  if(any(unlist(Q)  >  leder.b))  warning(paste0("Estimate of Q", ifelse(G > 1, " in one or more clusters ", " "), "is greater than ", ifelse(any(unlist(Q) > n.var), paste0("the number of variables (", n.var, ")"), paste0("the suggested Ledermann upper bound (", leder.b, ")\n"))), call.=FALSE)
+  if(any(unlist(Q) >= sizes) &&
+     G > 1   &&
+     !attr(sims, "ForceQg"))      warning("Estimate of Q is greater than the number of observations in one or more clusters:\nConsider setting 'forceQg' to TRUE\n", call.=FALSE)
   if(inf.Q)   {
     if(G1        <- G > 1)    {
       Q.tab      <- lapply(apply(Q.store, 1L, function(x) list(table(x, dnn=NULL))), "[[", 1L)
@@ -630,7 +644,8 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
                          Stored.Q = if(clust.ind) Q.store else as.vector(Q.store),
                          Q.Last = Q.store[,TN.store])
     GQ.res       <- if(inf.G)   c(GQ.temp1, GQ.temp4) else c(list(G = G), GQ.temp4)
-    GQ.res       <- if(cshrink) c(GQ.res, list(post.sigma = stats::setNames(rowmeans(sigmas), gnames))) else GQ.res
+    GQ.res       <- if(cshrink) c(GQ.res, list(post.sigma = stats::setNames(rowMeans2(sigmas), gnames))) else GQ.res
+   #GQ.res       <- if(gshrink) c(GQ.res, list(post.SIGMA = mean(SIGMAS))) else GQ.res
     GQ.res       <- c(GQ.res, list(Criteria = GQ.temp2))
     attr(GQ.res, "Q.big") <- attr(sims[[G.ind]][[Q.ind]], "Q.big")
   }
@@ -658,7 +673,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     eta.store    <- storeG[colMaxs(Q.store, value=TRUE) >= Qmax]
   } else    {
     eta.store    <- tmp.store
-    Lstore       <- if(inf.G) storeG else eta.store
+    Lstore       <- storeG
   }
   Qseq           <- seq_len(Qmax)
   store.e        <- (if(inf.Q) storeG  else tmp.store) %in% eta.store
@@ -689,9 +704,9 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   # Retrieve loadings and rotate
     if(sw["l.sw"]) {
       tmpind     <- ifelse(inf.Q, which.max(Q.store[g,] == Qg), 1L)
-      lmat       <- if(clust.ind) .a_drop(lmats[,,g,storeG, drop=FALSE], drop=3) else lmats[,,storeG, drop=FALSE]
-      l.temp     <- .a_drop(lmat[,,tmpind, drop=FALSE], drop=3)
-      l.temp     <- if(isTRUE(vari.rot)) .vari_max(l.temp, ...)$loadings         else l.temp
+      lmat       <- if(clust.ind) .a_drop(lmats[,,g,storeG, drop=FALSE], drop=3L) else lmats[,,storeG, drop=FALSE]
+      l.temp     <- .a_drop(lmat[,,tmpind, drop=FALSE], drop=3L)
+      l.temp     <- if(isTRUE(vari.rot)) .vari_max(l.temp, ...)$loadings          else l.temp
       if(inf.Q)   {
         rotind   <- Lstore[[g]][-1L]
         rotind   <- rotind[Q.store[g,rotind] > 1]
@@ -704,12 +719,12 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
         if(sw["s.sw"]      &&
            (p  %in%
             eta.store))     {
-          p2     <- if(inf.Q) eta.store == p else p
+          p2     <- if(inf.Q) eta.store == p   else p
           if(clust.ind)     {
             zp   <- z2[p,] == g
-            eta[zp,,p2]    <- .a_drop(eta[zp,,p2, drop=FALSE], 3) %*% proc$R
+            eta[zp,,p2]    <- .a_drop(eta[zp,,p2, drop=FALSE], 3L) %*% proc$R
           } else  {
-            eta[,,p2]      <- eta[,,p2,           drop=FALSE]     %*% proc$R
+            eta[,,p2]      <- .a_drop(eta[,,p2,   drop=FALSE], 3L) %*% proc$R
           }
         }
       }
@@ -748,16 +763,16 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
 
   # Compute posterior means and % variation explained
     if(sw["mu.sw"])  {
-      post.mu    <- if(clust.ind) rowmeans(mu)  else post.mu
-      var.mu     <- if(uni)       Var(mu)       else .row_vars(mu)
+      post.mu    <- if(clust.ind) rowMeans2(mu)  else post.mu
+      var.mu     <- if(uni)       Var(mu)        else .row_vars(mu)
       ci.tmp     <- rowQuantiles(mu,  probs=conf.levels)
-      ci.mu      <- if(uni)       t(ci.tmp)     else ci.tmp
+      ci.mu      <- if(uni)       t(ci.tmp)      else ci.tmp
     }
     if(sw["psi.sw"]) {
-      post.psi   <- if(clust.ind) rowmeans(psi) else post.psi
-      var.psi    <- if(uni)       Var(psi)      else .row_vars(psi)
+      post.psi   <- if(clust.ind) rowMeans2(psi) else post.psi
+      var.psi    <- if(uni)       Var(psi)       else .row_vars(psi)
       ci.tmp     <- rowQuantiles(psi, probs=conf.levels)
-      ci.psi     <- if(uni)       t(ci.tmp)     else ci.tmp
+      ci.psi     <- if(uni)       t(ci.tmp)      else ci.tmp
     }
     if(sw["l.sw"])   {
       lmat       <- lmat[,Qgs,if(inf.Q) Lstore[[g]] else storeG, drop=FALSE]
@@ -817,7 +832,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     class(means) <- "listof"
   }
   if(sw["mu.sw"]) {
-    last.mu      <- if(clust.ind) .a_drop(mus[,,TN.store, drop=FALSE], drop=3)  else  mu[,TN.store, drop=FALSE]
+    last.mu      <- if(clust.ind) .a_drop(mus[,,TN.store, drop=FALSE], drop=3L) else  mu[,TN.store, drop=FALSE]
     colnames(last.mu)      <- gnames
     means        <- c(means, list(last.mu = last.mu))
     class(means) <- "listof"
@@ -828,10 +843,11 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     post.load    <- .matnames(lapply(result, "[[", "post.load"), lnames)
     var.load     <- .matnames(lapply(result, "[[", "var.load"),  lnames)
     ci.load      <- .matnames(lapply(result, "[[", "ci.load"),   lnames, dim=3)
-    last.lmat    <- lapply(lmats2, function(x) { if(!is.null(x)) { x <- .a_drop(x[,,dim(x)[3L], drop=FALSE], drop=3); class(x) <- "loadings" }; x })
+    last.lmat    <- lapply(lmats2, function(x) { if(!is.null(x)) { x <- .a_drop(x[,,dim(x)[3L], drop=FALSE], drop=3L); class(x) <- "loadings" }; x })
     loads        <- list(lmats = lmats2, post.load = post.load, var.load = var.load, ci.load = ci.load, last.load = last.lmat)
     loads        <- lapply(loads, function(x)  { class(x) <-  "listof"; x} )
     if(cshrink)     attr(loads, "Sigma")    <- GQ.res$post.sigma
+   #if(gshrink)     attr(loads, "SIGMA")    <- GQ.res$post.SIGMA
     class(loads) <- "listof"
   }
   if(sw["psi.sw"]) {
@@ -848,11 +864,14 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     class(uniquenesses)    <- "listof"
   }
   if(sw["psi.sw"]) {
-    last.psi     <- if(clust.ind) .a_drop(psis[,,TN.store, drop=FALSE], drop=3) else  psi[,TN.store, drop=FALSE]
+    last.psi     <- if(clust.ind) .a_drop(psis[,,TN.store, drop=FALSE], drop=3L) else psi[,TN.store, drop=FALSE]
     colnames(last.psi)     <- gnames
     uniquenesses <- c(uniquenesses, list(last.psi = last.psi))
     class(uniquenesses)    <- "listof"
   }
+  dots           <- list(...)
+  dots           <- dots[unique(names(dots))]
+  dots$type      <- ifelse(is.null(dots$type), "F", dots$type[1L])
 
 # Calculate estimated covariance matrices & compute error metrics
   if(error.metrics) {
@@ -863,12 +882,22 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
     if(frobenius)   {
       orig.data  <- as.data.frame(dat)
       Pseq       <- seq_len(n.var)
-      xbins      <- lengths(sapply(orig.data, function(x) suppressWarnings(graphics::hist(x, plot=FALSE, ...))$counts))
-      dbreaks    <- lapply(Pseq, function(p) c(-Inf, as.numeric(sub("\\((.+),.*", "\\1", levels(cut(orig.data[[p]], xbins[[p]]))[-1L])), Inf))
+      if(is.null(dots$dbreaks)) {
+        xbins    <- lengths(sapply(orig.data, function(x) suppressWarnings(graphics::hist(x, plot=FALSE, ...))$counts))
+        dbreaks  <- lapply(Pseq,  function(p) c(-Inf, as.numeric(sub("\\((.+),.*", "\\1", levels(cut(orig.data[[p]], xbins[[p]]))[-1L])), Inf))
+      } else        {
+        dbreaks  <- dots$dbreaks
+        if(!is.list(dbreaks)   ||
+           !all(vapply(dbreaks, is.factor, logical(1L))) ||
+           n.var !=
+           length(dbreaks))       stop(paste0("'dbreaks' must be a list of length P=", n.var, " of factors as outputted by the function 'cut'"), call.=FALSE)
+        dbreaks  <- lapply(Pseq,  function(p) unique(c(-Inf, as.numeric(sub("\\((.+),.*", "\\1", levels(dbreaks[[p]])[-1L])), Inf)))
+        xbins    <- lengths(dbreaks) - 1L
+      }
       dcounts    <- mapply(tabulate, mapply(cut, orig.data, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
       nbins      <- max(xbins)
       dat.bins   <- sapply(dcounts, .padding, nbins)
-      datnorm    <- norm(dat.bins, "F")
+      datnorm    <- norm(dat.bins, dots$type)
       rcounts    <- vector("list", e.store)
     } else if(Q0X)  {             warning("Need the means and uniquenesses to have been stored for zero-factor models in order to compute the posterior predictive reconstruction error\n", call.=FALSE)
     } else                        warning("Need the means, uniquenesses, and loadings to have been stored in order to compute the posterior predictive reconstruction error\n",             call.=FALSE)
@@ -897,11 +926,11 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
         Q0Er     <- Q0E[,r]
         if(frobenius)   {
           if(inf.Q) QsEr       <- QsE[,r]
-          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, nn=tab.z[r,], mu=mu2[,,r], psi=psi2[,,r], method="marginal", forceQ=FALSE, loadings=if(!all(Q0Er)) lapply(Gseq, function(g) as.matrix(lmat2[,if(inf.Q) seq_len(QsEr[g]) else Qseq,g,r]))))
+          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, nn=tab.z[r,], mu=mu2[,,r], psi=psi2[,,r], method="marginal", forceQg=FALSE, loadings=if(!all(Q0Er)) lapply(Gseq, function(g) as.matrix(lmat2[,if(inf.Q) seq_len(QsEr[g]) else Qseq,g,r]))))
           rbinsx <- mapply(tabulate, mapply(cut, rdat, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
           rbins  <- sapply(rbinsx, .padding, nbins)
-          Frob   <- norm(dat.bins - rbins, "F")
-          rFro   <- norm(rbins, "F")
+          Frob   <- norm(dat.bins - rbins, dots$type)
+          rFro   <- norm(rbins, dots$type)
           minF   <- abs(datnorm - rFro)
           Fro[r] <- (Frob - minF)/(datnorm + rFro  - minF)
           rcounts[[r]] <- rbinsx
@@ -952,11 +981,11 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
             QsEr <- QsE[r]
             QsMs <- seq_len(QsEr)
           }
-          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, mu=mu2[,r], psi=psi2[,r], method="marginal", forceQ=FALSE, loadings=if(!Q0E[r]) as.matrix(lmat2[,QsMs,r])))
+          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, mu=mu2[,r], psi=psi2[,r], method="marginal", forceQg=FALSE, loadings=if(!Q0E[r]) as.matrix(lmat2[,QsMs,r])))
           rbinsx <- mapply(tabulate, mapply(cut, rdat, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
           rbins  <- sapply(rbinsx, .padding, nbins)
-          Frob   <- norm(dat.bins - rbins, "F")
-          rFro   <- norm(rbins, "F")
+          Frob   <- norm(dat.bins - rbins, dots$type)
+          rFro   <- norm(rbins, dots$type)
           minF   <- abs(datnorm - rFro)
           Fro[r] <- (Frob - minF)/(datnorm + rFro  - minF)
           rcounts[[r]] <- rbinsx
@@ -1005,7 +1034,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
        metricCI  <- rowQuantiles(metrics, probs=conf.levels)
        metricCI  <- if(cov.met && sw.pi) metricCI                   else provideDimnames(t(metricCI), base=list("PPRE", names(metricCI)))
        med.met   <- stats::setNames(rowMedians(metrics), rownames(metrics))
-       mean.met  <- stats::setNames(rowmeans(metrics),   rownames(metrics))
+       mean.met  <- stats::setNames(rowMeans2(metrics),  rownames(metrics))
        last.met  <- c(MSE = mse[e.store], MEDSE = medse[e.store], MAE = mae[e.store], MEDAE = medae[e.store], RMSE = rmse[e.store], NRMSE = nrmse[e.store])
        last.met  <- if(frobenius) c(last.met, PPRE = Fro[e.store])  else last.met
        last.met  <- last.met[!is.na(last.met)]
@@ -1015,6 +1044,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
          class(dcounts) <- "listof"
          class(rcounts) <- "listof"
          Err     <- c(Err, list(PPRE = Fro, DatCounts = dcounts, RepCounts = rcounts, Breaks = dbreaks))
+         attr(Err, "Norm")     <- dots$type
        }
        attr(Err, "ESS")        <- e.store
        errs      <- ifelse(frobenius, ifelse(cov.met && sw.pi, "All", "PPRE"), "Covs")
@@ -1028,7 +1058,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
    eta           <- eta[,Qseq,, drop=FALSE]
    colnames(eta) <- paste0("Factor", Qseq)
    scores        <- list(eta = eta, post.eta = rowMeans(eta, dims=2), var.eta = apply(eta, c(1L, 2L), Var),
-                         ci.eta = apply(eta, c(1L, 2L), stats::quantile, conf.levels), last.eta = .a_drop(eta[,,e.store, drop=FALSE], drop=3))
+                         ci.eta = apply(eta, c(1L, 2L), stats::quantile, conf.levels), last.eta = .a_drop(eta[,,e.store, drop=FALSE], drop=3L))
    attr(scores, "Eta.store")   <- e.store
    class(scores) <- "listof"
   }
@@ -1052,9 +1082,11 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   attr(result, "Discount")     <- if(is.element(method, c("IMFA", "IMIFA")) && !learn.d) attr(sims, "Discount")
   attr(result, "Errors")       <- errs
   attr(result, "Equal.Pi")     <- equal.pro
+  attr(result, "ForceQg")      <- attr(sims, "ForceQg")
   attr(result, "G.init")       <- if(inf.G) attr(sims, "G.init")
   attr(result, "G.Mean")       <- attr(sims, "G.Mean")
   attr(result, "G.Scale")      <- attr(sims, "G.Scale")
+ #attr(result, "G.Shrink")     <- gshrink
   attr(result, "Ind.Slice")    <- if(is.element(method, c("IMFA", "IMIFA"))) attr(sims, "Ind.Slice")
   attr(result, "Kappa0")       <- attr(sims, "Kappa0")
   attr(result, "Method")       <- method

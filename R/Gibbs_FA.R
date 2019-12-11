@@ -27,6 +27,7 @@
     }
     if(sw["s.sw"])   {
       eta.store  <- array(0L,  dim=c(N, Q, n.store))
+     #esig.store <- matrix(0L, nrow=Q, ncol=n.store)
     }
     if(sw["l.sw"])   {
       load.store <- array(0L,  dim=c(P, Q, n.store))
@@ -66,6 +67,8 @@
     # Scores & Loadings
       c.data     <- sweep(data, 2L, mu, FUN="-", check.margin=FALSE)
       if(Q0) {
+       #eta.sig  <- .sim_eta_sig(N=N, Q=Q, eta=eta)
+       #eta      <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1, eta.sig=eta.sig)
         eta      <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1)
         lmat     <- matrix(vapply(Pseq, function(j) .sim_load(l.sigma=l.sigma, Q=Q, c.data=c.data[,j], Q1=Q1,
                            eta=eta, psi.inv=psi.inv[j], EtE=crossprod(eta)), numeric(Q)), nrow=P, byrow=TRUE)
@@ -86,9 +89,13 @@
         post.psi <- post.psi + psi/n.store
         if(sw["mu.sw"])             mu.store[,new.it]   <- mu
         if(all(sw["s.sw"], Q0))   eta.store[,,new.it]   <- eta
+       #if(all(sw["s.sw"], Q0)) { eta.store[,,new.it]   <- eta
+                                 #esig.store[,new.it]   <- eta.sig
+       #}
         if(all(sw["l.sw"], Q0))  load.store[,,new.it]   <- lmat
         if(sw["psi.sw"])           psi.store[,new.it]   <- psi
                                      ll.store[new.it]   <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + if(uni) psi else diag(psi), log=TRUE))
+                                    #ll.store[new.it]   <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat %*% diag(eta.sig), lmat) + if(uni) psi else diag(psi), log=TRUE))
       }
     }
     if(verbose)  close(pb)
@@ -99,6 +106,7 @@
                       post.mu  = tryCatch(stats::setNames(post.mu,  varnames),            error=function(e) post.mu),
                       post.psi = tryCatch(stats::setNames(post.psi, varnames),            error=function(e) post.psi),
                       ll.store = ll.store,
+                     #eta.sig  = esig.store,
                       time     = init.time)
     attr(returns, "K")        <- PGMM_dfree(Q=Q, P=P, method=switch(EXPR=uni.type, constrained="UCU", single="UCC"))
       return(returns)

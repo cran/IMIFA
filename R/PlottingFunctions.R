@@ -16,7 +16,7 @@
 #' @param zlabels The true labels can be supplied if they are known. If this is not supplied, the function uses the labels that were supplied, if any, to \code{\link{get_IMIFA_results}}. Only relevant when \code{plot.meth = "zlabels"}. When explicitly supplied, misclassified observations are highlighted in the first type of uncertainty plot (otherwise observations whose uncertainty exceed the inverse of the number of clusters are highlighted). For the second type of uncertainty plot, when \code{zlabels} are explicitly supplied, the uncertainty of misclassified observations is marked by vertical lines on the profile plot.
 #' @param heat.map A logical which controls plotting posterior mean loadings or posterior mean scores as a heatmap, or else as something akin to \code{link{plot(..., type="h")}}. Only relevant if \code{param = "loadings"} (in which case the default is \code{TRUE}) or \code{param = "scores"} (in which case the default is \code{FALSE}). Heatmaps are produced with the aid of \code{\link{mat2cols}} and \code{\link{plot_cols}}.
 #' @param show.last A logical indicator which defaults to \code{FALSE}, but when \code{TRUE} replaces any instance of the posterior mean with the last valid sample. Only relevant when \code{param} is one of \code{"means"} \code{"scores"}, \code{"loadings"}, \code{"uniquenesses"}, or \code{"pis"} and \code{plot.meth} is one of \code{"all"} or \code{"means"}. Also relevant for \code{"means"}, \code{"loadings"} and \code{"uniquenesses"} when \code{plot.meth} is \code{"parallel.coords"}. When \code{TRUE}, this has the effect of forcing \code{intervals} to be \code{FALSE}.
-#' @param palette An optional colour palette to be supplied if overwriting the default palette set inside the function by \code{\link[viridisLite]{viridis}} is desired. it makes little sense to a supply a \code{palette} when \code{plot.meth="all"} and \code{param} is one of "\code{scores}" or "\code{loadings}".
+#' @param palette An optional colour palette to be supplied if overwriting the default palette set inside the function by \code{\link[viridisLite]{viridis}} is desired. It makes little sense to a supply a \code{palette} when \code{plot.meth="all"} and \code{param} is one of "\code{scores}" or "\code{loadings}".
 #' @param ind Either a single number indicating which variable to plot when \code{param} is one of \code{means} or \code{uniquenesses} (or \code{plot.meth="errors"}), or which cluster to plot if \code{param} is \code{pis}. If \code{scores} are plotted, a vector of length two giving which observation and factor to plot; if \code{loadings} are plotted, a vector of length two giving which variable and factor to plot. Will be recycled to length 2 if necessary. Also governs which two factors are displayed on posterior mean plots of the \code{"scores"} when \code{heat.map} is \code{FALSE}; otherwise only relevant when \code{mat} is \code{FALSE}.
 #' @param fac Optional argument that provides an alternative way to specify \code{ind[2]} when \code{mat} is \code{FALSE} and \code{param} is one of \code{scores} or \code{loadings}.
 #' @param by.fac Optionally allows (mat)plotting of scores and loadings by factor - i.e. observation(s) (scores) or variable(s) (loadings) for a given factor, respectively, controlled by \code{ind} or \code{fac}) when set to \code{TRUE}. Otherwise all factor(s) are plotted for a given observation or variable when set to \code{FALSE} (the default), again controlled by \code{ind} or \code{fac}. Only relevant when \code{param} is one of \code{scores} or \code{loadings}.
@@ -36,11 +36,13 @@
 #'
 #' When \code{mat} is \code{TRUE} and \code{by.fac} is \code{FALSE} (both defaults), the convention for dealing with overplotting for \code{trace} and \code{density} plots when \code{param} is either \code{scores} or \code{loadings} is to plot the last factor first, such that the first factor appears 'on top'.
 #' @keywords plotting main
+#' @method plot Results_IMIFA
 #' @importFrom Rfast "med" "colMedians"
+#' @importFrom matrixStats "rowRanges"
 #' @importFrom mclust "classError"
 #' @importFrom viridis "viridis"
 #' @seealso \code{\link{mcmc_IMIFA}}, \code{\link{get_IMIFA_results}}, \code{\link{mat2cols}}, \code{\link{plot_cols}}
-#' @references Murphy, K., Gormley, I. C. and Viroli, C. (2018) Infinite Mixtures of Infinite Factor Analysers, \emph{to appear}. <\href{https://arxiv.org/abs/1701.07010v4}{arXiv:1701.07010v4}>.
+#' @references Murphy, K., Viroli, C., and Gormley, I. C. (2019) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 1-27. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
 #'
 #' @author Keefe Murphy - <\email{keefe.murphy@@ucd.ie}>
 #' @usage
@@ -66,7 +68,7 @@
 #'      transparency = 0.75,
 #'      ...)
 #' @examples
-#' # See the vignette associated with the package for more graphical examples:
+#' \donttest{# See the vignette associated with the package for more graphical examples:
 #' # vignette("IMIFA", package = "IMIFA")
 #'
 #' # data(olive)
@@ -90,7 +92,7 @@
 #' # Visualise empirical vs. estimated covariance error metrics
 #' # plot(resIMIFA, plot.meth="errors", g=3)
 #'
-#' # Look at the trace, density, posterior mean and correlation of various parameters of interest
+#' # Look at the trace, density, posterior mean, and correlation of various parameters of interest
 #' # plot(resIMIFA, plot.meth="all", param="means", g=1)
 #' # plot(resIMIFA, plot.meth="all", param="means", g=1, ind=2)
 #' # plot(resIMIFA, plot.meth="all", param="scores")
@@ -99,7 +101,7 @@
 #' # plot(resIMIFA, plot.meth="all", param="loadings", g=1, heat.map=FALSE)
 #' # plot(resIMIFA, plot.meth="parallel.coords", param="uniquenesses")
 #' # plot(resIMIFA, plot.meth="all", param="pis", intervals=FALSE, partial=TRUE)
-#' # plot(resIMIFA, plot.meth="all", param="alpha")
+#' # plot(resIMIFA, plot.meth="all", param="alpha")}
 plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density", "errors", "GQ", "means", "parallel.coords", "trace", "zlabels"), param = c("means", "scores", "loadings", "uniquenesses", "pis", "alpha", "discount"), g = NULL, mat = TRUE,
                                 zlabels = NULL, heat.map = TRUE, show.last = FALSE, palette = NULL, ind = NULL, fac = NULL, by.fac = FALSE, type = c("h", "n", "p", "l"), intervals = TRUE, common = TRUE, partial = FALSE, titles = TRUE, transparency = 0.75, ...) {
 
@@ -116,6 +118,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   defpar$new        <- FALSE
   suppressWarnings(graphics::par(pty="m"))
   mispal            <- missing(palette)
+  oldpal            <- grDevices::palette()
   if(mispal)             palette <- viridis(min(10L, max(G, Q.max, 5L)))
   if(!all(is.cols(cols=palette)))     stop("Supplied colour palette contains invalid colours", call.=FALSE)
   if(length(palette) < 5)             warning("Palette should contain 5 or more colours\n",    call.=FALSE)
@@ -138,9 +141,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   suppressWarnings(graphics::par(cex.axis=0.8, new=FALSE))
   on.exit(suppressWarnings(graphics::par(defpar)))
   on.exit(do.call(graphics::clip, as.list(defpar$usr)), add=TRUE)
-  on.exit(grDevices::palette("default"), add=TRUE)
-  on.exit(suppressWarnings(options(defopt)),  add=TRUE)
+  on.exit(grDevices::palette(oldpal),                   add=TRUE)
+  on.exit(suppressWarnings(options(defopt)),            add=TRUE)
   dots    <- list(...)
+  dots    <- dots[unique(names(dots))]
   if(brX  <- "breaks" %in% names(dots)) {
     brXs  <- dots[["breaks"]]
   }
@@ -825,7 +829,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
             graphics::title(main=list(paste0(post.last, ifelse(!all.ind, " Loadings ", " "), "Heatmap", ifelse(all(!all.ind, grp.ind), paste0(" - Cluster ", g), ""))))
             graphics::axis(1, line=-0.5, tick=FALSE, at=seq_len(Q), labels=seq_len(Q))
             if(n.var < 100) {
-              graphics::axis(2, cex.axis=0.5, line=-0.5, tick=FALSE, las=1, at=seq_len(n.var), labels=substring(var.names[n.var:1L], 1, 10))
+              graphics::axis(2, cex.axis=0.5, line=-0.5, tick=FALSE, las=1, at=seq_len(n.var), labels=substring(var.names[n.var:1L], 1L, 11L))
             }
             suppressWarnings(heat_legend(data=pxx, cols=hcols, cex.lab=0.8, ...))
           }
@@ -1058,7 +1062,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       }
 
       if(!any(plotQ.ind,
-              plotG.ind, plotT.ind))  message("Nothing to plot\n")
+              plotG.ind, plotT.ind))  message(paste0("Nothing to plot", switch(EXPR=method, FA=paste0(": Q = ", Q, "\n"), "\n")))
       gq.nam <- toupper(substring(names(GQ.res), 1L, 1L))
       if(is.element(method, c("IMIFA", "OMIFA")))      {
         if(g == 1)   {
@@ -1066,6 +1070,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         } else if(g == 2) {
           if(adapt)  {
             print(if(attr(x, "C.Shrink")) GQ.res[gq.nam == "Q" | gq.nam == "P"] else GQ.res[gq.nam == "Q"])
+           #print(if(attr(x, "C.Shrink") || attr(x, "G.shrink")) GQ.res[gq.nam == "Q" | gq.nam == "P"] else GQ.res[gq.nam == "Q"])
           } else print(GQ.res[gq.nam == "P"])
         } else if(g == 3 && !critx)    {
           print(GQ.res[gq.nam   == "C"])
@@ -1077,7 +1082,9 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
             print(GQ.res[gq.nam != "G" & gq.nam != "S"])
           }
       } else if(!critx)          {
-        switch(EXPR=method, MFA=, MIFA={
+        switch(EXPR=method, MFA= {
+          print(GQ.res[gq.nam   != "S"])
+        }, MIFA={
           if(adapt)  {
             print(GQ.res[gq.nam != "S"])
           } else     {
@@ -1089,9 +1096,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
           } else     {
             print(GQ.res[gq.nam == "C"])
           }
-        },
-          cat(paste0("Q = ", Q, "\n"))
-        )
+        })
       }
       if(all(g == max(Gs), !critx && any(dim(bicm) > 1))) {
         G.ind  <- if(any(G.supp, !is.element(method, c("MFA", "MIFA")))) 1L else n.grp == G
@@ -1113,7 +1118,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       }
       if(plotQ.ind) {
         if(!adapt)                    message("No adaptation took place\n")
-        if(attr(GQ.res, "Q.big"))     warning("Q had to be prevented from exceeding its initial value.\nConsider re-running the model with a higher value for 'range.Q'\n", call.=FALSE)
+        forceQg      <- attr(x, "ForceQg")
+        if(attr(GQ.res, "Q.big"))     warning(paste0("Q had to be prevented from exceeding its initial value", ifelse(forceQg, " (or exceeding the number of observations in one or more clusters)", ""), ".\nConsider re-running the model with a higher value for 'range.Q'", ifelse(forceQg, " or setting 'forceQg' to FALSE\n", "\n")), call.=FALSE)
       }
     }
 
@@ -1244,7 +1250,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
                        uniquenesses= if(show.last) x$Uniquenesses$last.psi   else x$Uniquenesses$post.psi,
                        loadings    = if(show.last) x$Loadings$last.load[[g]] else x$Loadings$post.load[[g]])
       plot.x <- switch(EXPR=param, loadings=plot.x[,rev(seq_len(Q)), drop=FALSE], plot.x)
-      x.plot <- apply(plot.x, 1L, range, na.rm=TRUE)
+      x.plot <- rowRanges(plot.x, na.rm=TRUE)
       plot.x <- if(param == "uniquenesses" && is.element(uni.type, c("isotropic", "single"))) plot.x else apply(plot.x, 2L, function(x) (x - min(x, na.rm=TRUE))/(max(x, na.rm=TRUE) - min(x, na.rm=TRUE)))
       varnam <- paste0(toupper(substr(param, 1L, 1L)), substr(param, 2L, nchar(param)))
       if(any(grp.ind, param == "loadings")) {
@@ -1268,7 +1274,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         if(titles && n.var < 100) {
           graphics::text(c(i, i), c(switch(EXPR=param, uniquenesses=switch(EXPR=uni.type, single=, isotropic=graphics::par("usr")[3L], 0), 0),
                          switch(EXPR=param, uniquenesses=switch(EXPR=uni.type, single=, isotropic=graphics::par("usr")[4L], 1), 1)),
-                         labels=format(x.plot[,i], digits=3), xpd=NA, offset=0.3, pos=c(1, 3), cex=0.5)
+                         labels=format(x.plot[i,], digits=3), xpd=NA, offset=0.3, pos=c(1, 3), cex=0.5)
         }
       }
       if(any(grp.ind, param  == "loadings")) {
@@ -1291,7 +1297,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
      if(Pind) {
        graphics::boxplot(error$PPRE, col=palette[length(palette)])
        if(titles)    {
-         graphics::title(main=list("Posterior Predictive\nReconstruction Error"))
+         graphics::title(main=list(paste0("Posterior Predictive Reconstruction Error\n(using the ", switch(EXPR=toupper(attr(error, "Norm")), O=, "1"="One", I="Infinity", "F"="Frobenius", M="Maximum", "2"="Spectral"), " norm)")))
          graphics::mtext("PPRE", side=2, line=2)
          graphics::mtext(method, side=1, line=1)
        }
@@ -1432,7 +1438,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(is.element(param, c("alpha", "discount"))) {
         plot.x <- switch(EXPR=param, alpha=clust$Alpha$alpha, discount=as.vector(clust$Discount$discount))
         if(switch(EXPR=param, alpha=clust$Alpha$alpha.rate,   discount=clust$Discount$disc.rate) == 0 ||
-           length(unique(round(plot.x, min(.ndeci(plot.x))))) == 1) {
+           (attr(x, "Discount") >= 0 && length(unique(round(plot.x, min(.ndeci(plot.x))))) == 1)) {
                                       warning(paste0(switch(EXPR=param, alpha="Acceptance", discount=ifelse(attr(x, "Kappa0"), "Acceptance", "Mutation")), " rate too low: can't plot ", ifelse(all.ind, ifelse(partial, "partial-", "auto-"), ""), "correlation function", ifelse(all.ind, "\n", "s\n")), call.=FALSE)
           next
         }
@@ -1663,9 +1669,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #'
 #' Plots the prior distribution of the number of clusters under a Pitman-Yor / Dirichlet process prior, for a sample of size \code{N} at given values of the concentration parameter \code{alpha} and optionally also the \code{discount} parameter. Useful for soliciting sensible priors (or fixed values) for \code{alpha} or \code{discount} under the "\code{IMFA}" and "\code{IMIFA}" methods for \code{\link{mcmc_IMIFA}}.
 #' @param N The sample size.
-#' @param alpha The concentration parameter. Must be specified and must be strictly greater than \code{-discount}.
-#' @param discount The discount parameter for the Pitman-Yor process. Must lie in the interval [0, 1). Defaults to 0 (i.e. the Dirichlet process).
+#' @param alpha The concentration parameter. Must be specified and must be strictly greater than \code{-discount}. The case \code{alpha=0} is accommodated. When \code{discount} is negative \code{alpha} must be a positive integer multiple of \code{abs(discount)}.
+#' @param discount The discount parameter for the Pitman-Yor process. Must be less than 1, but typically lies in the interval [0, 1). Defaults to 0 (i.e. the Dirichlet process). When \code{discount} is negative \code{alpha} must be a positive integer multiple of \code{abs(discount)}.
 #' @param show.plot Logical indicating whether the plot should be displayed (default = \code{TRUE}).
+#' @param type The type of plot to be drawn, as per \code{\link[graphics]{plot}}. Default to "\code{h}": histogram-like vertical lines.
 #'
 #' @details All arguments are vectorised. Users can also consult \code{\link{G_expected}} and \code{\link{G_variance}} in order to solicit sensible priors.
 #' @note The actual density values are returned invisibly. Therefore, they can be visualised as desired by the user even if \code{show.plot} is \code{FALSE}.
@@ -1675,14 +1682,16 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #' @keywords plotting
 #' @seealso \code{\link{G_expected}}, \code{\link{G_variance}}, \code{\link[Rmpfr]{Rmpfr}}
 #'
-#' @note Requires use of the \code{\link[Rmpfr]{Rmpfr}} and \code{gmp} libraries; may encounter difficulty and slowness for large \code{N}, especially with non-zero \code{discount} values.
+#' @note Requires use of the \code{\link[Rmpfr]{Rmpfr}} and \code{gmp} libraries; may encounter difficulty and slowness for large \code{N}, especially with non-zero \code{discount} values. Despite the high precision arithmetic used, the functions can be unstable for small values of \code{discount}.
 #'
 #' @author Keefe Murphy - <\email{keefe.murphy@@ucd.ie}>
+#' @references De Blasi, P., Favaro, S., Lijoi, A., Mena, R. H., Prunster, I., and Ruggiero, M. (2015) Are Gibbs-type priors the most natural generalization of the Dirichlet process?, \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 37(2): 212-229.
 #' @usage
 #' G_priorDensity(N,
 #'                alpha,
 #'                discount = 0,
-#'                show.plot = TRUE)
+#'                show.plot = TRUE,
+#'                type = "h")
 #' @examples
 #' # Plot Dirichlet process priors for different values of alpha
 #' (DP   <- G_priorDensity(N=50, alpha=c(3, 10, 25)))
@@ -1695,24 +1704,33 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #'
 #' # Now plot them to examine tail behaviour as discount increases
 #' # (PY <- G_priorDensity(N=50, alpha=c(19.23356, 6.47006, 1), discount=c(0, 0.47002, 0.7300045)))
-  G_priorDensity      <- function(N, alpha, discount = 0, show.plot = TRUE) {
+  G_priorDensity      <- function(N, alpha, discount = 0, show.plot = TRUE, type = "h") {
     firstex    <- suppressMessages(requireNamespace("Rmpfr", quietly=TRUE))
     if(isTRUE(firstex)) {
       on.exit(.detach_pkg("Rmpfr"))
-      on.exit(.detach_pkg("gmp"),                       add=TRUE)
+      on.exit(.detach_pkg("gmp"),                    add=TRUE)
     } else                            stop("'Rmpfr' package not installed", call.=FALSE)
-    on.exit(grDevices::palette("default"), add=!isTRUE(firstex))
+    oldpal    <- grDevices::palette()
+    on.exit(grDevices::palette(oldpal),              add=isFALSE(firstex))
     defpar    <- suppressWarnings(graphics::par(no.readonly=TRUE))
     defpar$new        <- FALSE
     suppressWarnings(graphics::par(pty="m"))
-    on.exit(suppressWarnings(graphics::par(defpar)))
+    on.exit(suppressWarnings(graphics::par(defpar)), add=TRUE)
     defopt     <- options()
     options(expressions = 500000)
-    on.exit(suppressWarnings(options(defopt)),          add=TRUE)
+    on.exit(suppressWarnings(options(defopt)),       add=TRUE)
 
     if(any(c(length(N),
              length(show.plot)) > 1)) stop("Arguments 'N' and 'show.plot' must be strictly of length 1", call.=FALSE)
     if(!is.logical(show.plot))        stop("'show.plot' must be a single logical indicator", call.=FALSE)
+    if(isTRUE(show.plot))       {
+      if(length(type) > 1  ||
+         !is.character(type)   ||
+         nchar(type)  > 1)            stop("'type' must be a single character", call.=FALSE)
+      if(!is.element(type,
+         c("p", "l", "b", "c", "o",
+           "h", "s", "S", "n")))      stop("Invalid 'type'", call.=FALSE)
+    }
     max.len    <- max(length(alpha),  length(discount))
     if(max.len  > 10)                 stop("Can't plot more than ten distributions simultaneously", call.=FALSE)
     if(!is.element(length(alpha),
@@ -1721,9 +1739,11 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
        c(1, max.len)))                stop("'discount' must be of length 1 or length(alpha)", call.=FALSE)
     if(!all(is.numeric(discount), is.numeric(alpha),
             is.numeric(N)))           stop("'N', 'alpha', and 'discount' inputs must be numeric", call.=FALSE)
-    if(any(discount < 0,
-       discount >= 1))                stop("'discount' must lie in the interval [0,1)", call.=FALSE)
-    if(any(alpha <= - discount))      stop("'alpha' must be strictly greater than -discount", call.=FALSE)
+    if(any(discount     >= 1))        stop("'discount' must be less than 1", call.=FALSE)
+    if(any(discount > 0  &
+       alpha   <= - discount))        stop("'alpha' must be strictly greater than -discount", call.=FALSE)
+    if(any(discount < 0  &
+       alpha   %% discount != 0))     stop("'alpha' must be a positive integer multiple of 'abs(discount)' when 'discount' is negative", call.=FALSE)
     if(length(alpha)    != max.len) {
       alpha    <- rep(alpha,    max.len)
     }
@@ -1737,22 +1757,36 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
     for(i in seq_len(max.len)) {
       alphi    <- Rmpfr::mpfr(alpha[i],    precBits=256)
       disci    <- Rmpfr::mpfr(discount[i], precBits=256)
-      if(disci == 0) {
+      if(disci == 0)  {
         vnk    <- exp(Nsq2 * log(alphi)     - log(Rmpfr::pochMpfr(alphi, N)))
         rx[,i] <- gmp::asNumeric(abs(vnk    * Rmpfr::.bigz2mpfr(gmp::Stirling1.all(N))))
-      } else  {
-        vnk    <- c(Rmpfr::mpfr(0,         precBits=256),  cumsum(log(alphi + Nseq[-N] * disci)))   -
+      } else    {
+        if(disci > 0) {
+          vnk  <- c(Rmpfr::mpfr(0,         precBits=256),  cumsum(log(alphi + Nseq[-N]   * disci)))         -
                   log(Rmpfr::pochMpfr(alphi + 1, N - 1L)) - Nsq2 * log(disci)
+        } else  {
+          m    <- as.integer(alphi/abs(disci))
+          mn   <- min(m, N)
+          seqN <- seq_len(mn - 1L)
+          vnk  <- c(c(Rmpfr::mpfr(0,       precBits=256),  cumsum(log(m - seqN))  + seqN * log(abs(disci))) -
+                  log(Rmpfr::pochMpfr(alphi + 1, N - 1L)) - c(seqN, mn) * log(abs(disci)), rep(-Inf, N - mn))
+        }
         lnkd   <- lapply(Nseq, function(g) Rmpfr::sumBinomMpfr(g, f=function(k) Rmpfr::pochMpfr(-k * disci, N)))
         rx[,i] <- gmp::asNumeric(exp(vnk    - lfactorial(Nsq2))  * abs(methods::new("mpfr", unlist(lnkd))))
       }
     }
 
     if(isTRUE(show.plot))   {
-      cols     <- seq(from=2L, to=max.len   + 1L)
-      grDevices::palette(grDevices::adjustcolor(rep(cols, 2L), alpha.f=ifelse(grDevices::dev.capabilities()$semiTransparency && max.len > 1, 0.5, 1)))
-      graphics::matplot(x=seq_len(N), y=rx, type="h", col=cols, xlab="Clusters", ylim=c(0, max(rx)), ylab="Density", lend=1,
-                        main=paste0("Prior Distribution of G\nN=", N), lwd=seq(3L, 1L, length.out=max.len), lty=seq_len(2L))
+     if(max.len > 1)        {
+        cols   <- seq(from=2L, to=max.len   + 1L)
+        grDevices::palette("default")
+        grDevices::palette(grDevices::adjustcolor(cols, alpha.f=ifelse(grDevices::dev.capabilities()$semiTransparency && max.len > 1, 0.75, 1)))
+        graphics::matplot(x=seq_len(N), y=rx, type=type, col=cols, xlab="Clusters", ylim=c(0, max(rx)), ylab="Density", lend=1, pch=19,
+                          main=paste0("Prior Distribution of G\nN=", N), lwd=seq(3L, 1L, length.out=max.len), lty=seq_len(2L))
+     } else     {
+        graphics::plot(x=seq_len(N), y=rx, type=type, xlab="Clusters", ylim=c(0, max(rx)), ylab="Density",
+                       lend=1, pch=19, main=paste0("Prior Distribution of G\nN=", N), lwd=2L, lty=1L)
+     }
     }
       invisible(if(max.len == 1) as.vector(rx) else rx)
   }
@@ -1911,7 +1945,6 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #'                  ind = NULL,
 #'                  ...)
 #' @examples
-#' \dontrun{
 #' # Load the USPS data and discard peripheral digits
 #' data(USPSdigits)
 #' ylab  <- USPSdigits$train[,1]
@@ -1919,18 +1952,19 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #' ind   <- apply(train, 2, sd) > 0.7
 #' dat   <- train[,ind]
 #'
-#' # Fit an IMIFA model (warning: quite slow!)
+#' \donttest{# Fit an IMIFA model (warning: quite slow!)
 #' # sim <- mcmc_IMIFA(dat, n.iters=100, prec.mu=1e-03, z.init="kmeans",
-#'                     centering=FALSE, scaling="none")
+#' #                   centering=FALSE, scaling="none")
 #' # res <- get_IMIFA_results(sim, zlabels=ylab)
 #'
 #' # Examine the posterior mean image of the first two clusters
 #' show_IMIFA_digit(res, dat=train, ind=ind)
 #' show_IMIFA_digit(res, dat=train, ind=ind, G=2)}
   show_IMIFA_digit <- function(res, G = 1L, what = c("mean", "last"), dat = NULL, ind = NULL, ...) {
-    UseMethod("show_IMIFA_digit")
+      UseMethod("show_IMIFA_digit")
   }
 
+#' @method show_IMIFA_digit Results_IMIFA
 #' @importFrom matrixStats "colMeans2"
 #' @export
   show_IMIFA_digit.Results_IMIFA <- function(res, G = 1L, what = c("mean", "last"), dat = NULL, ind = NULL, ...) {
