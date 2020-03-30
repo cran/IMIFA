@@ -38,7 +38,7 @@ data(olive)
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  simOMIFA <- mcmc_IMIFA(olive, method="OMIFA", n.iters=10000, range.G=10, alpha=0.8,
-#                         alpha.d1=3.5, nu=3, alpha.d2=7, prop=0.6, epsilon=0.12)
+#                         alpha.d1=3.5, nu=3, alpha.d2=7, prop=0.8, epsilon=0.01)
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE)

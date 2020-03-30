@@ -15,7 +15,7 @@
 #'  \item{"\code{IMIFA}"}{Infinite Mixtures of Infinite Factor Analysers}
 #' }
 #' In principle, of course, one could overfit the "\code{MFA}" or "\code{MIFA}" models, but it is recommend to use the corresponding model options which begin with `O' instead. Note that the "\code{classify}" method is not yet implemented.
-#' @param range.G Depending on the method employed, either the range of values for the number of clusters, or the conseratively high starting value for the number of clusters. Defaults to (and must be!) \code{1} for the "\code{FA}" and "\code{IFA}" methods. For the "\code{MFA}" and "\code{MIFA}" models this is to be given as a range of candidate models to explore. For the "\code{OMFA}", "\code{OMIFA}", "\code{IMFA}", and "\code{IMIFA}" models, this is the conservatively high number of clusters with which the chain is to be initialised (default = \code{max(25, ceiling(3 * log(N)))} for large N, or \code{min(N-1, ceiling(3 * log(N)))} for small N<=50).
+#' @param range.G Depending on the method employed, either the range of values for the number of clusters, or the conservatively high starting value for the number of clusters. Defaults to (and must be!) \code{1} for the "\code{FA}" and "\code{IFA}" methods. For the "\code{MFA}" and "\code{MIFA}" models this is to be given as a range of candidate models to explore. For the "\code{OMFA}", "\code{OMIFA}", "\code{IMFA}", and "\code{IMIFA}" models, this is the conservatively high number of clusters with which the chain is to be initialised (default = \code{max(25, ceiling(3 * log(N)))} for large N, or \code{min(N-1, ceiling(3 * log(N)))} for small N<=50).
 #'
 #' For the "\code{OMFA}", and "\code{OMIFA}" models this upper limit remains fixed for the entire length of the chain; the upper limit for the for the "\code{IMFA}" and "\code{IMIFA}" models can be specified via \code{trunc.G} (see \code{\link{bnpControl}}), which must satisfy \code{range.G <= trunc.G < N}.
 #'
@@ -26,7 +26,7 @@
 #'
 #' If \code{length(range.G) * length(range.Q)} is large, consider not storing unnecessary parameters (via \code{\link{storeControl}}), or breaking up the range of models to be explored into chunks and sending each chunk to \code{\link{get_IMIFA_results}}.
 #'
-#' See \code{\link{Ledermann}} for bounds on \code{range.Q}; this is useful in both the finite factor and infinite factor settings, as one may wish to ensure te fixed number of factors, or upper limits on the number of factors, respectively, respects this bound to yield indentifiable solutions, particularly in low-dimensional settings.
+#' See \code{\link{Ledermann}} for bounds on \code{range.Q}; this is useful in both the finite factor and infinite factor settings, as one may wish to ensure the fixed number of factors, or upper limits on the number of factors, respectively, respects this bound to yield indentifiable solutions, particularly in low-dimensional settings.
 #' @param MGP A list of arguments pertaining to the multiplicative gamma process (MGP) shrinkage prior and adaptive Gibbs sampler (AGS). For use with the infinite factor models "\code{IFA}", "\code{MIFA}", "\code{OMIFA}", and "\code{IMIFA}" only. Defaults are set by a call to \code{\link{mgpControl}}, with further checking of validity by \code{\link{MGP_check}} (though arguments can also be supplied here directly).
 #' @param BNP A list of arguments pertaining to the Bayesian Nonparametric Pitman-Yor / Dirichlet process priors, for use with the infinite mixture models "\code{IMFA}" and "\code{IMIFA}", or select arguments related to the Dirichlet concentration parameter for the overfitted mixtures "\code{OMFA}" and \code{"OMIFA"}. Defaults are set by a call to \code{\link{bnpControl}} (though arguments can also be supplied here directly).
 #' @param mixFA A list of arguments pertaining to \emph{all other} aspects of model fitting, e.g. MCMC settings, cluster initialisation, and hyperparameters common to every \code{method} in the \code{IMIFA} family. Defaults are set by a call to \code{\link{mixfaControl}} (though arguments can also be supplied here directly).
@@ -52,7 +52,7 @@
 #' \item{\strong{\code{\link{storeControl}}} - }{Supply logical indicators governing storage of parameters of interest for all models in the IMIFA family. It may be useful not to store certain parameters if memory is an issue (e.g. for large data sets or for a large number of MCMC iterations after burnin and thinning).}
 #' }
 #' Note however that the named arguments of these functions can also be supplied directly. Parameter starting values are obtained by simulation from the relevant prior distribution specified in these control functions, though initial means and mixing proportions are computed empirically.
-#' @return A list of lists of lists of class "\code{IMIFA}" to be passed to \code{\link{get_IMIFA_results}}. If the returned object is \code{x}, candidate models are accesible via subsetting, where \code{x} is of the following form:
+#' @return A list of lists of lists of class "\code{IMIFA}" to be passed to \code{\link{get_IMIFA_results}}. If the returned object is \code{x}, candidate models are accessible via subsetting, where \code{x} is of the following form:
 #'
 #' \code{x[[1:length(range.G)]][[1:length(range.Q)]]}.
 #'
@@ -60,7 +60,7 @@
 #' @keywords IMIFA main
 #' @export
 #' @importFrom matrixStats "colMeans2" "colSums2" "rowLogSumExps" "rowMeans2" "rowSums2"
-#' @importFrom Rfast "matrnorm"
+#' @importFrom Rfast "colVars" "matrnorm"
 #' @importFrom mvnfast "dmvn"
 #' @importFrom slam "as.simple_sparse_array" "as.simple_triplet_matrix"
 #' @importFrom mclust "emControl" "Mclust" "mclustBIC" "mclustICL" "hc" "hclass" "hcE" "hcEEE" "hcEII" "hcV" "hcVII" "hcVVV"
@@ -153,6 +153,9 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   thinning  <- mixFA$thinning
   centering <- mixFA$centering
   scaling   <- mixFA$scaling
+ #hetero    <- mixFA$hetero
+ #mixFA$eta.shape   <- mixFA$eta.hyper[1L]
+ #mixFA$eta.rate    <- mixFA$eta.hyper[2L]
   iters     <- seq(from=burnin + 2L, to=n.iters + 1L, by=thinning)
   iters     <- iters[iters  > 0]
   if(length(iters)   < 10)          stop("Run a longer chain!", call.=FALSE)
@@ -167,7 +170,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
     raw.dat <- raw.dat[,num.check,    drop=FALSE]
   }
   glo.mean  <- colMeans2(data.matrix(raw.dat))
-  glo.scal  <- .col_vars(data.matrix(raw.dat), std=TRUE)
+  glo.scal  <- colVars(data.matrix(raw.dat), std=TRUE)
   if(isTRUE(mixFA$drop0sd)) {
     sdx     <- glo.scal
     sd0ind  <- sdx  <= 0
@@ -411,6 +414,13 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
    MGP$nu2  <- nu2         <- MGP$phi.hyper[2L]
    MGP$rho1 <- rho1        <- if(MGP$cluster.shrink && method != "IFA") MGP$sigma.hyper[1L]
    MGP$rho2 <- rho2        <- if(MGP$cluster.shrink && method != "IFA") MGP$sigma.hyper[2L]
+  #if((!mgpmiss$global.shrink          &&
+  #   !MGP$global.shrink)  &&
+  #   (MGP$cluster.shrink  &&
+  #  method == "IFA"))              warning("'global.shrink' invoked as 'cluster.shrink' is TRUE and the IFA method is used", call.=FALSE, immediate.=TRUE)
+  #MGP$global.shrink       <- MGP$global.shrink || (MGP$cluster.shrink && method == "IFA")
+  #MGP$omega1      <- omega1           <- MGP$SIGMA.hyper[1L]
+  #MGP$omega2      <- omega2           <- MGP$SIGMA.hyper[2L]
    alpha.d1 <- .len_check(MGP$alpha.d1, delta0g, method, P, G.init, P.dim=FALSE)
    alpha.d2 <- .len_check(MGP$alpha.d2, delta0g, method, P, G.init, P.dim=FALSE)
    MGP      <- MGP[-seq_len(5L)]
@@ -648,12 +658,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
       }
       clust[[g]]   <- list(z = zi[[g]], pi.alpha = alpha, pi.prop = pi.prop[[g]])
       if(is.element(method, c("MFA", "MIFA"))) {
-        sw0g.tmp   <- sw0gs
-        if(all(g > 9, any(sw0gs))) {
-          sw0g.tmp <- stats::setNames(vector("logical", 4L), names(sw0gs))
-                                    warning(paste0(names(which(sw0gs)), " set to FALSE where G > 9, as 'exact' label-switching is not possible in this case\n"), call.=FALSE)
-        }
-        clust[[g]] <- append(clust[[g]], list(l.switch = sw0g.tmp))
+        clust[[g]] <- append(clust[[g]], list(l.switch = sw0gs))
       }
       if(is.element(method, c("classify", "MIFA"))) {
         clust[[g]] <- append(clust[[g]], list(alpha.d1 = alpha.d1[[g]], alpha.d2 = alpha.d2[[g]]))
@@ -701,6 +706,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
     ad1uu          <- unique(unlist(alpha.d1))
     ad2uu          <- unique(unlist(alpha.d2))
     check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, bd1=MGP$beta.d1, bd2=MGP$beta.d2))
+   #check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, bd1=MGP$beta.d1, bd2=MGP$beta.d2, SIGMA.shape=MGP$omega1, SIGMA.rate=MGP$omega2))
     if(!all(check.mgp$valid))       stop("Invalid shrinkage hyperparameter values WILL NOT encourage loadings column removal.\nTry using the MGP_check() function in advance to ensure the cumulative shrinkage property holds.", call.=FALSE)
     if(any(attr(check.mgp, "Warning"))) {
       if(any(ad2uu <= ad1uu))       warning("Column shrinkage hyperparameter values MAY NOT encourage loadings column removal.\n'alpha.d2' should be moderately large relative to 'alpha.d1'\n", call.=FALSE, immediate.=TRUE)
@@ -787,7 +793,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
     if(centered)                    warning("Data supplied is globally centered, are you sure?\n", call.=FALSE)
     for(g in seq_len(range.G))  {
       tmp.dat      <- raw.dat[zlabels == levels(zlabels)[g],]
-      scal         <- switch(EXPR=scaling, none=FALSE, .col_vars(as.matrix(tmp.dat), std=TRUE))
+      scal         <- switch(EXPR=scaling, none=FALSE, colVars(as.matrix(tmp.dat), std=TRUE))
       scal         <- switch(EXPR=scaling, pareto=sqrt(scal), scal)
       tmp.dat      <- .scale2(as.matrix(tmp.dat), center=centering, scale=scal)
       if(sigmu.miss) {
@@ -840,6 +846,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   attr(imifa, "G.Mean")   <- if(attr(imifa, "Center")) glo.mean
   attr(imifa, "G.Scale")  <- if(scaling != "none")     switch(EXPR=scaling, pareto=sqrt(glo.scal), glo.scal)
  #attr(imifa, "G.Shrink") <- is.element(method, c("IFA", "MIFA", "OMIFA", "IMIFA")) && MGP$global.shrink
+ #attr(imifa, "Hetero")   <- mixFA$hetero
   attr(imifa, "IM.labsw") <- is.element(method, c("IMFA", "IMIFA"))    && IM.lab.sw
   attr(imifa,
        "Ind.Slice")       <- is.element(method, c("IMFA", "IMIFA"))    && BNP$ind.slice

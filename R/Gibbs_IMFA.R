@@ -102,7 +102,7 @@
     } else psi.inv   <- replicate(trunc.G, .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), simplify="array")
     psi.inv          <- if(uni) t(psi.inv) else psi.inv
     if(isTRUE(one.uni)) {
-      psi.inv[]      <- 1/switch(EXPR=uni.type, constrained=.col_vars(data), max(.col_vars(data)))
+      psi.inv[]      <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
     } else   {
       tmp.psi        <- (nn[nn0] - 1L)/pmax(rowsum(data^2, z) - rowsum(data, z)^2/nn[nn0], 0L)
       tmp.psi        <- switch(EXPR=uni.type, unconstrained=t(tmp.psi), matrix(Rfast::rowMaxs(tmp.psi, value=TRUE), nrow=P, ncol=G, byrow=TRUE))
@@ -118,7 +118,18 @@
       ksi            <- (1 - rho)   * rho^(Ts  - 1L)
       log.ksi        <- log(ksi)
       slinf          <- rep(-Inf, N)
+     #if(thresh)  {
+     #  ksi2         <- ksi
+     #  log.ksi2     <- log.ksi
+     #}
     } else slinf     <- c(-Inf,  0L)
+    stop()
+   #if((noLearn      <-
+   #  (isFALSE(learn.alpha)     &&
+   #   isFALSE(learn.d)))       &&
+   #   isTRUE(thresh))           {
+   #  TRX           <- .slice_threshold(N, pi.alpha, discount, MPFR=pi.alpha == 0)
+   #}
     init.time        <- proc.time() - start.time
 
   # Iterate
@@ -171,11 +182,19 @@
                                lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
 
     # Slice Sampler
+     #if(thresh)      {
+     #  TRX          <- ifelse(noLearn, TRX, .slice_threshold(N, pi.alpha, discount, MPFR=pi.alpha == 0))
+     #}
       if(!ind.slice)  {
+       #ksi          <- if(thresh) pmin(pi.prop, TRX) else pi.prop
         ksi          <- pi.prop
         log.ksi      <- log(ksi)
       }
-      u.slice        <- stats::runif(N, 0, ksi[z])
+     #} else if(thresh)   {
+     #  ksi          <- pmin(ksi2, TRX)
+     #  log.ksi      <- log(ksi)
+     #}
+      u.slice        <- stats::runif(N, 0L, ksi[z])
       min.u          <- min(u.slice)
       G.old          <- G
       if(ind.slice)   {
@@ -216,6 +235,10 @@
           Vs         <- Vs[Gs]
         }
       }
+     #if(thresh)      {
+     #  ksi          <- pmax(if(ind.slice) ksi2 else pi.prop, TRX)
+     #  log.ksi      <- log(ksi)
+     #}
 
     # Cluster Labels
       if(G > 1)  {

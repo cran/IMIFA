@@ -6,6 +6,7 @@
   .gibbs_FA      <- function(Q, data, iters, N, P, sigma.mu, mu, burnin,
                              thinning, uni.type, uni.prior, psi.alpha, psi.beta,
                              sw, mu.zero, verbose, sigma.l, scaling, ...) {
+                            #sw, mu.zero, verbose, sigma.l, scaling, hetero, eta.shape, eta.rate, ...) {
 
   # Define & initialise variables
     start.time   <- proc.time()
@@ -27,7 +28,9 @@
     }
     if(sw["s.sw"])   {
       eta.store  <- array(0L,  dim=c(N, Q, n.store))
-     #esig.store <- matrix(0L, nrow=Q, ncol=n.store)
+     #if(hetero)     {
+     #  esig.store         <- matrix(0L, nrow=Q, ncol=n.store)
+     #}
     }
     if(sw["l.sw"])   {
       load.store <- array(0L,  dim=c(P, Q, n.store))
@@ -47,10 +50,11 @@
     psi.beta     <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
     uni.shape    <- switch(EXPR=uni.type,  constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
     V            <- switch(EXPR=uni.type,  constrained=P,                single=1L)
+   #eta          <- if(hetero) .sim_het_p(Q=Q, N=N, eta.shape=eta.shape, eta.rate=eta.rate) else .sim_eta_p(Q=Q, N=N)
     eta          <- .sim_eta_p(Q=Q, N=N)
     lmat         <- matrix(.sim_load_p(Q=Q, P=P, sigma.l=sigma.l), nrow=P, ncol=Q)
     psi.inv      <- .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta)
-    psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=.col_vars(data, avg=mu), max(.col_vars(data, avg=mu)))
+    psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
     max.p        <- (psi.alpha  - 1)/psi.beta
     inf.ind      <- psi.inv > max(max.p)
     psi.inv[inf.ind]       <- switch(EXPR=uni.type, constrained=max.p, rep(max.p, P))[inf.ind]
@@ -67,8 +71,10 @@
     # Scores & Loadings
       c.data     <- sweep(data, 2L, mu, FUN="-", check.margin=FALSE)
       if(Q0) {
-       #eta.sig  <- .sim_eta_sig(N=N, Q=Q, eta=eta)
-       #eta      <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1, eta.sig=eta.sig)
+       #if(hetero)              {
+       # eta.sig <- .sim_eta_sig(N=N, Q=Q, eta=eta, eta.shape=eta.shape, eta.rate=eta.rate)
+       # eta     <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1, eta.sig=eta.sig)
+       #} else eta         <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1)
         eta      <- .sim_score(N=N, Q=Q, lmat=lmat, psi.inv=psi.inv, c.data=c.data, Q1=Q1)
         lmat     <- matrix(vapply(Pseq, function(j) .sim_load(l.sigma=l.sigma, Q=Q, c.data=c.data[,j], Q1=Q1,
                            eta=eta, psi.inv=psi.inv[j], EtE=crossprod(eta)), numeric(Q)), nrow=P, byrow=TRUE)
@@ -90,12 +96,12 @@
         if(sw["mu.sw"])             mu.store[,new.it]   <- mu
         if(all(sw["s.sw"], Q0))   eta.store[,,new.it]   <- eta
        #if(all(sw["s.sw"], Q0)) { eta.store[,,new.it]   <- eta
-                                 #esig.store[,new.it]   <- eta.sig
+       #if(hetero)                esig.store[,new.it]   <- eta.sig
        #}
         if(all(sw["l.sw"], Q0))  load.store[,,new.it]   <- lmat
         if(sw["psi.sw"])           psi.store[,new.it]   <- psi
                                      ll.store[new.it]   <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + if(uni) psi else diag(psi), log=TRUE))
-                                    #ll.store[new.it]   <- sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat %*% diag(eta.sig), lmat) + if(uni) psi else diag(psi), log=TRUE))
+                                    #ll.store[new.it]   <- if(hetero) sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat %*% diag(eta.sig), lmat) + if(uni) psi else diag(psi), log=TRUE)) else sum(dmvn(X=data, mu=mu, sigma=tcrossprod(lmat) + if(uni) psi else diag(psi), log=TRUE))
       }
     }
     if(verbose)  close(pb)
@@ -106,7 +112,7 @@
                       post.mu  = tryCatch(stats::setNames(post.mu,  varnames),            error=function(e) post.mu),
                       post.psi = tryCatch(stats::setNames(post.psi, varnames),            error=function(e) post.psi),
                       ll.store = ll.store,
-                     #eta.sig  = esig.store,
+                     #eta.sig  = if(hetero) esig.store,
                       time     = init.time)
     attr(returns, "K")        <- PGMM_dfree(Q=Q, P=P, method=switch(EXPR=uni.type, constrained="UCU", single="UCC"))
       return(returns)
