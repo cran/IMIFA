@@ -6,6 +6,7 @@
   .gibbs_IMFA        <- function(Q, data, iters, N, P, G, mu.zero, rho, sigma.l, learn.alpha, discount, mu, tune.zeta,
                                  a.hyper, sigma.mu, burnin, thinning, d.hyper, learn.d, uni.type, uni.prior, trunc.G,
                                  ind.slice, psi.alpha, psi.beta, verbose, sw, cluster, IM.lab.sw, zeta, kappa, ...) {
+                                #ind.slice, psi.alpha, psi.beta, verbose, sw, cluster, IM.lab.sw, zeta, kappa, thresh, ...) {
 
   # Define & initialise variables
     start.time       <- proc.time()
@@ -61,6 +62,7 @@
       d.unif         <- d.shape1 == 1   && d.shape2 == 1
       .sim_disc_mh   <- if(!learn.alpha && pi.alpha == 0) .sim_d_slab else .sim_d_spike
     } else d.rates   <- 1L
+    Dneg             <- !learn.d        && discount  < 0
     MH.step          <- any(discount  > 0, learn.d) && learn.alpha
     if(MH.step)     {
       a.rates        <- vector("integer", total)
@@ -123,12 +125,11 @@
      #  log.ksi2     <- log.ksi
      #}
     } else slinf     <- c(-Inf,  0L)
-    stop()
    #if((noLearn      <-
    #  (isFALSE(learn.alpha)     &&
    #   isFALSE(learn.d)))       &&
    #   isTRUE(thresh))           {
-   #  TRX           <- .slice_threshold(N, pi.alpha, discount, MPFR=pi.alpha == 0)
+   #  TRX            <- .slice_threshold(N, pi.alpha, discount, MPFR=pi.alpha == 0)
    #}
     init.time        <- proc.time() - start.time
 
@@ -142,6 +143,7 @@
       pi.prop        <- .sim_pi_inf(Vs, len=G)
       index          <- order(pi.prop, decreasing=TRUE)
       prev.prod      <- pi.prop[G]  * (1/Vs[G] - 1)
+      GI             <- which(Gs[index] == G)
       pi.prop        <- pi.prop[index]
       Vs             <- Vs[index]
       mu[,Gs]        <- mu[,index, drop=FALSE]
@@ -198,13 +200,13 @@
       min.u          <- min(u.slice)
       G.old          <- G
       if(ind.slice)   {
-        G.new        <- sum(min.u   < ksi)
+        G.new        <- sum(min.u    < ksi)
         G.trunc      <- G.new < G.old
-        while(G  < G.new && (Vs[G] != 1 || pi.prop[G] != 0)) {
+        while(G  < G.new && (Vs[GI] != 1 || pi.prop[GI] != 0)) {
           newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1L, lseq=G + 1L)
           Vs         <- c(Vs,      newVs)
           pi.prop    <- c(pi.prop, newVs * prev.prod)
-          G          <- G + 1L
+          GI    <- G <- G + 1L
           prev.prod  <- pi.prop[G]  * (1/Vs[G] - 1)
         }
         G            <- ifelse(G.trunc, G.new, G)
@@ -217,7 +219,7 @@
         cum.pi       <- sum(pi.prop)
         u.max        <- 1 - min.u
         G.trunc      <- cum.pi > u.max
-        while(cum.pi <= u.max && trunc.G > G && (pi.prop[G] != 0 || Vs[G] != 1)) {
+        while(cum.pi <= u.max && trunc.G > G && (pi.prop[GI] != 0 || Vs[GI] != 1)) {
           newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1L, lseq=G + 1L)
           Vs         <- c(Vs,      newVs)
           newPis     <- newVs  *   prev.prod
@@ -225,7 +227,7 @@
           cum.pi     <- cum.pi +   newPis
           ksi        <- pi.prop
           log.ksi    <- c(log.ksi, log(newPis))
-          G          <- G + 1L
+          GI    <- G <- G + 1L
           prev.prod  <- pi.prop[G] * (1/Vs[G] - 1)
         }
         G            <- ifelse(G.trunc, which.max(cumsum(pi.prop) > u.max), G)
@@ -272,15 +274,14 @@
 
     # Alpha
       if(learn.alpha)      {
-        non.zero.d   <- discount != 0
-        if(discount   < 0) {
-          pi.alpha   <- if(discount < 0) G * abs.disc else pi.alpha
-        } else if(isTRUE(non.zero.d))  {
+        if((non0d    <- discount != 0)  && Dneg) {
+          pi.alpha   <- G  * abs.disc
+        } else if(isTRUE(non0d))  {
           MH.alpha   <- .sim_alpha_m(alpha=pi.alpha, discount=discount, alpha.shape=alpha.shape, alpha.rate=alpha.rate, N=N, G=G.non, zeta=zeta)
           pi.alpha   <- MH.alpha$alpha
           a.rate     <- MH.alpha$rate
           if(isTRUE(zeta.tune)) {
-            d.count  <- d.count + non.zero.d
+            d.count  <- d.count + non0d
             if(iter  >= startz &&
                iter   < stopz)  {
               zeta   <- .tune_zeta(zeta=zeta, time=d.count, l.rate=MH.alpha$l.prob, heat=heat, target=target, lambda=lambda)

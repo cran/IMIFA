@@ -37,8 +37,8 @@ data(olive)
 #                         range.G=1:3, z.init="kmeans")
 
 ## ---- eval=FALSE--------------------------------------------------------------
-#  simOMIFA <- mcmc_IMIFA(olive, method="OMIFA", n.iters=10000, range.G=10, alpha=0.8,
-#                         alpha.d1=3.5, nu=3, alpha.d2=7, prop=0.8, epsilon=0.01)
+#  simOMIFA <- mcmc_IMIFA(olive, method="OMIFA", n.iters=10000, range.G=10, learn.alpha=TRUE,
+#                         nu=3, alpha.d1=3.5, alpha.d2=7, prop=0.8, epsilon=0.01)
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  simIMIFA <- mcmc_IMIFA(olive, method="IMIFA", n.iters=50000, verbose=FALSE)
@@ -56,7 +56,7 @@ data(olive)
 load(file="res_olive_IMIFA__Edited-Vignette-only-Version.rda")
 
 ## -----------------------------------------------------------------------------
-summary(resIMIFA)
+summary(resIMIFA, MAP=TRUE)
 
 ## ---- results='hide', eval=FALSE----------------------------------------------
 #  plot(resIMIFA, plot.meth="GQ")
