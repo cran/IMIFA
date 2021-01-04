@@ -8,7 +8,7 @@
                                  alpha.d1, discount, alpha.d2, cluster, b0, b1, IM.lab.sw, zeta, tune.zeta, rho1, rho2, nu1, nu2,
                                  cluster.shrink, prop, d.hyper, beta.d1, beta.d2, start.AGS, stop.AGS, epsilon, learn.d, kappa, forceQg, ...) {
                                 #cluster.shrink, global.shrink, omega1, omega2, hetero, eta.shape, eta.rate, prop, d.hyper, beta.d1,
-                                #beta.d2, start.AGS, stop.AGS, epsilon, learn.d, kappa, forceQg, thresh, ...) {
+                                #beta.d2, start.AGS, stop.AGS, epsilon, learn.d, kappa, forceQg, thresh, exchange, ...) {
 
   # Define & initialise variables
     start.time       <- proc.time()
@@ -151,7 +151,6 @@
       slinf          <- rep(-Inf, N)
      #if(thresh)  {
      #  ksi2         <- ksi
-     #  log.ksi2     <- log.ksi
      #}
     } else slinf     <- c(-Inf,  0L)
    #if((noLearn      <-
@@ -168,13 +167,20 @@
       storage        <- is.element(iter, iters)
 
     # Mixing Proportions & Re-ordering
+     #if(!exchange)   {
       Vs             <- .sim_vs_inf(alpha=pi.alpha, nn=nn[Gs], N=N, discount=discount, len=G, lseq=Gs)
       pi.prop        <- .sim_pi_inf(Vs, len=G)
+      prev.prod      <- 1 - sum(pi.prop)
+     #} else          {
+     #  piX          <- .sim_pi_infX(nn=nn[nn0], Kn=G.non, G=G, alpha=pi.alpha, discount=discount)
+     #  pi.prop      <- piX$pi.prop
+     #  prev.prod    <- piX$prev.prod
+     #}
       index          <- order(pi.prop, decreasing=TRUE)
-      prev.prod      <- pi.prop[G]  * (1/Vs[G] - 1)
       GI             <- which(Gs[index] == G)
       pi.prop        <- pi.prop[index]
       Vs             <- Vs[index]
+     #Vs             <- if(!exchange) Vs[index] else rep(0L, G)
       mu[,Gs]        <- mu[,index, drop=FALSE]
       phi[Gs]        <- phi[index]
       delta[Gs]      <- delta[index]
@@ -280,8 +286,8 @@
      #  TRX          <- ifelse(noLearn, TRX, .slice_threshold(N, pi.alpha, discount, MPFR=pi.alpha == 0))
      #}
       if(!ind.slice)  {
-       #ksi          <- if(thresh) pmin(pi.prop, TRX) else pi.prop
         ksi          <- pi.prop
+       #ksi          <- if(thresh) pmin(pi.prop, TRX) else pi.prop
         log.ksi      <- log(ksi)
       }
      #} else if(thresh)   {
@@ -294,14 +300,15 @@
       if(ind.slice)   {
         G.new        <- sum(min.u    < ksi)
         G.trunc      <- G.new < G.old
+       #while(G  < G.new && (ifelse(exchange, prev.prod >= min.u, Vs[GI] != 1) || pi.prop[GI] != 0)) {
         while(G  < G.new && (Vs[GI] != 1 || pi.prop[GI] != 0)) {
           newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1L, lseq=G + 1L)
           Vs         <- c(Vs,      newVs)
-          pi.prop    <- c(pi.prop, newVs * prev.prod)
+          pi.prop    <- c(pi.prop, newVs  * prev.prod)
           GI    <- G <- G + 1L
           eta.tmp    <- c(eta.tmp, list(.empty_mat(nc=Qs[G])))
          #eta.sig    <- c(eta.sig, list(1/.rgamma0(Qs[G], eta.shape, eta.rate)))
-          prev.prod  <- pi.prop[G]  * (1/Vs[G] - 1)
+          prev.prod  <- 1 - sum(pi.prop)
         }
         G            <- ifelse(G.trunc, G.new, G)
         Gs           <- seq_len(G)
@@ -313,18 +320,19 @@
         cum.pi       <- sum(pi.prop)
         u.max        <- 1 - min.u
         G.trunc      <- cum.pi > u.max
-        while(cum.pi <= u.max && trunc.G > G && (pi.prop[GI] != 0 || Vs[GI] != 1)) {
+       #while(cum.pi  < u.max && trunc.G > G && (pi.prop[GI] != 0 || ifelse(exchange, prev.prod >= min.u, Vs[GI] != 1))) {
+        while(cum.pi  < u.max && trunc.G > G && (pi.prop[GI] != 0 || Vs[GI] != 1)) {
           newVs      <- .sim_vs_inf(alpha=pi.alpha, discount=discount, len=1L, lseq=G + 1L)
           Vs         <- c(Vs,      newVs)
           newPis     <- newVs  *   prev.prod
-          pi.prop    <- c(pi.prop, newPis)
-          cum.pi     <- cum.pi +   newPis
-          ksi        <- pi.prop
+          pi.prop    <-
+          ksi        <- c(pi.prop, newPis)
           log.ksi    <- c(log.ksi, log(newPis))
+          cum.pi     <- cum.pi +   newPis
           GI    <- G <- G + 1L
           eta.tmp    <- c(eta.tmp, list(.empty_mat(nc=Qs[G])))
          #eta.sig    <- c(eta.sig, list(1/.rgamma0(Qs[G], eta.shape, eta.rate)))
-          prev.prod  <- pi.prop[G] * (1/Vs[G] - 1)
+          prev.prod  <- 1 - cum.pi
         }
         G            <- ifelse(G.trunc, which.max(cumsum(pi.prop) > u.max), G)
         Gs           <- seq_len(G)

@@ -116,7 +116,7 @@
 #'
 #' @return A Dirichlet vector of \code{G} weights which sum to 1.
 #'
-#' @note Though the function is available for standalone use, note that no checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}.
+#' @note Though the function is available for standalone use, note that few checks take place, in order to speed up repeated calls to the function inside \code{\link{mcmc_IMIFA}}. In particular, \code{alpha} and \code{nn} may be invisibly recycled.
 #'
 #' While small values of \code{alpha} have the effect of increasingly concentrating the mass onto fewer components, note that this function may return \code{NaN} for excessively small values of \code{alpha}, when \code{nn=0}; see the details of \code{rgamma} for small \code{shape} values.
 #'
@@ -132,8 +132,8 @@
 #' (posterior  <- rDirichlet(G=5, alpha=1, nn=c(20, 41, 32, 8, 12)))
 #' (asymmetric <- rDirichlet(G=5, alpha=c(3,4,5,1,2), nn=c(20, 41, 32, 8, 12)))
     rDirichlet   <- function(G, alpha, nn = 0L) {
-      if(length(alpha)   != 1    &&
-         length(alpha)   != G)             stop("Invalid alpha", call.=FALSE)
+      if(!all(0   < alpha))                stop("'alpha' must be strictly positive",  call.=FALSE)
+      if(!all(0  <= nn))                   stop("'nn' must be strictly non-negative", call.=FALSE)
       shape      <- alpha + nn
       tmp        <- if(all(shape == 1)) stats::rexp(G, rate=1L) else stats::rgamma(G, shape=shape, rate=1L)
         tmp/sum(tmp)
@@ -147,13 +147,26 @@
         }
     }
 
-    .sim_pi_inf  <- function(vs, len, init = 0) {
-        vs * cumprod(1 - c(init, vs[-len]))
+    .sim_pi_inf  <- function(vs, len, prev.prod = 0) {
+        vs * cumprod(1 - c(prev.prod, vs[-len]))
     }
 
-   #.slice_threshold  <- function(N, alpha, d = 0, ...) {
-   #  ((alpha + d * G_expected(N, alpha, d, ...)) * (1 - d))/((alpha + N) * (alpha + 1))
-   #}
+    # .sim_pi_infX <- function(nn, Kn, G, alpha, discount = 0) {
+    #   Kn1        <- Kn + 1L
+    #   pirG       <- rDirichlet(Kn1, c(nn - discount, alpha + Kn * discount))
+    #   rG         <- pirG[Kn1]
+    #   pis        <- pirG[-Kn1]
+    #   if(G > Kn)  {
+    #     Vs       <- .sim_vs_inf(alpha=alpha, discount=discount, len=G - Kn, lseq=Kn1)
+    #     pis      <- c(pis, .sim_pi_inf(vs=Vs, len=length(Vs), prev.prod=1 - rG))
+    #     rG       <- 1 - sum(pis)
+    #   }
+    #     return(list(pi.prop = pis, prev.prod = rG))
+    # }
+    #
+    # .slice_threshold  <- function(N, alpha, discount = 0, ...) {
+    #   ((alpha + discount * G_expected(N, alpha, discount, ...)) * (1 - discount))/((alpha + N) * (alpha + 1))
+    # }
 
   # Cluster Labels
 #' Simulate Cluster Labels from Unnormalised Log-Probabilities using the Gumbel-Max Trick
@@ -1562,6 +1575,8 @@
 #' @param trunc.G The maximum number of allowable and storable clusters under the \code{"IMIFA"} and \code{"IMFA"} models. The number of active clusters to be sampled at each iteration is adaptively truncated, with \code{trunc.G} as an upper limit for storage reasons. Defaults to \code{max(min(N-1, 50), range.G))} and must satisfy \code{range.G <= trunc.G < N}. Note that large values of \code{trunc.G} may lead to memory capacity issues.
 #' @param kappa The spike-and-slab prior distribution on the \code{discount} hyperparameter is assumed to be a mixture with point-mass at zero and a continuous Beta(a,b) distribution. \code{kappa} gives the weight of the point mass at zero (the 'spike'). Must lie in the interval [0,1]. Defaults to 0.5. Only relevant when \code{isTRUE(learn.d)}. A value of 0 ensures non-zero discount values (i.e. Pitman-Yor) at all times, and \emph{vice versa}. Note that \code{kappa} will default to exactly 0 if \code{alpha<=0} and \code{learn.alpha=FALSE}.
 #' @param IM.lab.sw Logical indicating whether the two forced label switching moves are to be implemented (defaults to \code{TRUE}) when running one of the infinite mixture models.
+# #' @param thresh Logical indicating whether the threshold of Fall and Barat (2014) should be incorporated into the slice sampler. See the reference for details. This is an experimental feature (defaults to \code{FALSE}).
+# #' @param exchange Logical indicating whether the exchangeable slice sampler of Fall and Barat (2014) should be used instead. See the reference for details. This argument can work with or without \code{thresh=TRUE} above, though it is also an experimental argument and thus defaults to \code{FALSE}. \strong{Note}: this argument cannot be \code{TRUE} when \code{IM.lab.sw} is also \code{TRUE} (its default).
 #' @param zeta
 #' \describe{
 #' \item{For the \code{"IMFA"} and \code{"IMIFA"} methods:}{Tuning parameter controlling the acceptance rate of the random-walk proposal for the Metropolis-Hastings steps when \code{learn.alpha=TRUE}, where \code{2 * zeta} gives the full width of the uniform proposal distribution. These steps are only invoked when either \code{discount} is non-zero and fixed or \code{learn.d=TRUE}, otherwise \code{alpha} is learned by Gibbs updates. Must be strictly positive (if invoked). Defaults to \code{2}.}
@@ -1592,6 +1607,8 @@
 #' @references Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
 #'
 #' Kalli, M., Griffin, J. E. and Walker, S. G. (2011) Slice sampling mixture models, \emph{Statistics and Computing}, 21(1): 93-105.
+# #'
+# #' Fall, M. D. and Barat, E. (2014) Gibbs sampling methods for Pitman-Yor mixture models, \emph{hal-00740770v2}.
 #' @export
 #'
 #' @seealso \code{\link{mcmc_IMIFA}}, \code{\link{G_priorDensity}}, \code{\link{G_moments}}, \code{\link{mixfaControl}}, \code{\link{mgpControl}}, \code{\link{storeControl}}
@@ -1607,6 +1624,8 @@
 #'            trunc.G = NULL,
 #'            kappa = 0.5,
 #'            IM.lab.sw = TRUE,
+# #'            thresh = FALSE,
+# #'            exchange = FALSE,
 #'            zeta = NULL,
 #'            tune.zeta = list(...),
 #'            ...)
@@ -1620,7 +1639,9 @@
 #' # sim   <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000, learn.d=FALSE,
 #' #                     ind.slice=FALSE, alpha.hyper=c(3, 3))
   bnpControl     <- function(learn.alpha = TRUE, alpha.hyper = c(2L, 4L), discount = 0, learn.d = TRUE, d.hyper = c(1L, 1L),
-                             ind.slice = TRUE, rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, zeta = NULL, tune.zeta = list(...), ...) { # thresh = FALSE
+                             ind.slice = TRUE, rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, zeta = NULL, tune.zeta = list(...), ...) {
+ #bnpControl     <- function(learn.alpha = TRUE, alpha.hyper = c(2L, 4L), discount = 0, learn.d = TRUE, d.hyper = c(1L, 1L), ind.slice = TRUE,
+ #                           rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, thresh = FALSE, exchange = FALSE, zeta = NULL, tune.zeta = list(...), ...) {
     miss.args    <- list(discount = missing(discount), IM.lab.sw = missing(IM.lab.sw), kappa = missing(kappa),
                          trunc.G = missing(trunc.G), zeta = missing(zeta), learn.d = missing(learn.d), learn.alpha = missing(learn.alpha))
     if(any(!is.logical(learn.alpha),
@@ -1641,7 +1662,9 @@
       (rho >= 1  || rho   < 0))            stop("'rho' must be a single number in the interval [0, 1)", call.=FALSE)
     if(rho  < 0.5)                         warning("Are you sure 'rho' should be less than 0.5? This could adversely affect mixing\n", call.=FALSE, immediate.=TRUE)
    #if(any(!is.logical(thresh),
-   #       length(thresh)         != 1))   stop("'thresh' must be a single logical indicator", call.=FALSE)
+   #       length(thresh)         != 1))   stop("'thresh' must be a single logical indicator",   call.=FALSE)
+   #if(any(!is.logical(exchange),
+   #       length(exchange)       != 1))   stop("'exchange' must be a single logical indicator", call.=FALSE)
     if(!missing(trunc.G) &&
        (length(trunc.G)   > 1     ||
         !is.numeric(trunc.G)      ||
@@ -1673,6 +1696,7 @@
            discount      != 0))            stop(paste0("'kappa' is exactly 1 and yet", ifelse(learn.d, " 'discount' is being learned ", if(discount != 0) " the discount is fixed at a non-zero value"), ":\nthe discount should remain fixed at zero"), call.=FALSE)
     if(any(!is.logical(IM.lab.sw),
        length(IM.lab.sw) != 1))            stop("'IM.lab.sw' must be a single logical indicator", call.=FALSE)
+   #if(all(exchange, IM.lab.sw))           stop("'exchange' cannot be TRUE when 'IM.lab.sw' is also TRUE", call.=FALSE)
     if(!missing(zeta)    &&
        any(!is.numeric(zeta),
        length(zeta)      != 1,
@@ -1721,10 +1745,10 @@
       }
     }
     attr(tz,  "IM.Need") <- any(gibbs.def, def.py)
+   #BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper, thresh = thresh,
+   #                     exchange = exchange, rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
     BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper,
                          rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
-   #BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper, thresh = thresh,
-   #                     rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
     attr(BNP, "Missing") <- miss.args
       BNP
   }

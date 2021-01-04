@@ -240,9 +240,9 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
               is.null(dots[names(dots) != "modelNames"]$modelName),
               is.null(dots$modelName))) {
       dots$modelName      <- ifelse(NlP, "EII", "VVV")
-      if(is.element(dots$modelname,
-         c("E", "V"))     && uni)  stop("'Hierarchical clustering models 'E' and 'V' can only be employed for univariate data", call.=FALSE)
     }
+    if(is.element(dots$modelName,
+       c("E", "V"))       && !uni)  stop("mclust's 'E' and 'V' hierarchical clustering models can only be employed for univariate data", call.=FALSE)
     dots$use              <- ifelse(is.null(dots$use), "VARS", dots$use)
   }
   if(z.init == "kmeans"   && is.null(dots$nstart))    {
@@ -840,6 +840,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
        "Disc.step")       <- is.element(method, c("IMFA", "IMIFA"))    && learn.d
   attr(imifa, "Discount") <- if(is.element(method, c("IMFA", "IMIFA")) && !learn.d) discount
   attr(imifa, "Equal.Pi") <- equal.pro
+ #attr(imifa, "Exchange") <- BNP$exchange
   attr(imifa, "Factors")  <- range.Q
   attr(imifa, "ForceQg")  <- MGP$forceQg && is.element(method, c("MIFA", "OMIFA", "IMIFA"))
   attr(imifa, "G.init")   <- G.init
@@ -872,6 +873,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
     times                 <- times[-2L]
   }
   class(times)            <- "listof"
+ #attr(imifa, "Thresh")   <- BNP$thresh
   attr(imifa, "Time")     <- if(is.element(method, c("FA", "IFA", "classify"))) times[-length(times)] else times
   attr(imifa, "TuneZeta") <- is.element(method, c("IMFA", "IMIFA", "OMFA", "OMIFA")) && tune.zeta$do
   attr(imifa, "Uni.Meth") <- c(Uni.Prior = uni.prior, Uni.Type = uni.type)
