@@ -120,7 +120,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   suppressWarnings(graphics::par(pty="m"))
   mispal            <- missing(palette)
   oldpal            <- grDevices::palette()
-  if(mispal)             palette <- viridis(min(10L, max(G, Q.max, 5L)))
+  if(mispal)             palette <- viridis(min(10L, max(G, Q.max, 5L)), option="D")
   if(!all(is.cols(cols=palette)))     stop("Supplied colour palette contains invalid colours", call.=FALSE)
   if(length(palette) < 5)             warning("Palette should contain 5 or more colours\n",    call.=FALSE)
   trx     <- grDevices::dev.capabilities()$semiTransparency
@@ -209,7 +209,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   if(param == "uniquenesses") {
     mat   <- switch(EXPR=uni.type, constrained=, unconstrained=mat, FALSE)
   }
-  mat     <- ifelse(n.var == 1, FALSE, mat)
+  mat     <- n.var != 1 && mat
   z.miss  <- missing(zlabels)
   if(!z.miss) {
     if(all(!is.factor(zlabels), !is.logical(zlabels), !is.numeric(zlabels)) ||
@@ -257,7 +257,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
          length(intervals) != 1))     stop("'intervals' must be a single logical indicator", call.=FALSE)
   if(any(!is.logical(mat),
          length(mat)       != 1))     stop("'mat' must be a single logical indicator",       call.=FALSE)
-  common       <- ifelse(missing(common) && all(grp.ind, !all.ind, m.sw["M.sw"], param == "scores", heat.map), FALSE, ifelse(grp.ind, common, TRUE))
+  common       <- !(missing(common) && all(grp.ind, !all.ind, m.sw["M.sw"], param == "scores", heat.map)) && (!grp.ind || common)
   if(any(!is.logical(common),
          length(common)    != 1))     stop("'common' must be a single logical indicator",    call.=FALSE)
   if(any(!is.logical(partial),
@@ -425,7 +425,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(param == "means")  {
         plot.x <- x$Means$mus[[g]]
         if(matx) {
-          if(mispal) grDevices::palette(viridis(var.pal, alpha=transparency))
+          if(mispal) grDevices::palette(viridis(var.pal, option="D", alpha=transparency))
           graphics::matplot(t(plot.x), type="l", ylab="", xlab="Iteration", lty=1, ylim=if(is.element(method, c("FA", "IFA"))) c(-1, 1), col=seq_along(grDevices::palette()))
           if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, "", paste0(":\nMeans", ifelse(grp.ind, paste0(" - Cluster ", g), ""))))))
         } else {
@@ -438,10 +438,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         x.plot <- x$Scores$eta
         if(by.fac) {
           plot.x  <- x.plot[,ind[2L],]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.obs)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.obs)), option="D", alpha=transparency))
         } else {
           plot.x  <- if(Q.max > 1) x.plot[ind[1L],rev(Qmseq),] else t(x.plot[ind[1L],rev(Qmseq),])
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q.max)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q.max)), option="D", alpha=transparency))
         }
         if(matx) {
           scols   <- seq_along(grDevices::palette())
@@ -461,10 +461,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         x.plot <- x$Loadings$lmats[[g]]
         if(by.fac) {
           plot.x  <- x.plot[,ind[2L],]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.var)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.var)), option="D", alpha=transparency))
         } else {
           plot.x  <- x.plot[ind[1L],rev(seq_len(Q)),]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q)),     alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q)),     option="D", alpha=transparency))
         }
         if(matx) {
           lcols   <- seq_along(grDevices::palette())
@@ -476,14 +476,14 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
           }
         } else   {
           base::plot(x=iter, y=x.plot[ind[1L],ind[2L],], type="l", ylab="", xlab="Iteration")
-          if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, ":\n", paste0(":\nLoadings - ", ifelse(grp.ind, paste0("Cluster ", g, " - "), ""))), var.names[ind[1L]], " Variable, Factor ", ind[2L])))
+          if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, ":\n", paste0(":\nLoadings - ",   ifelse(grp.ind, paste0("Cluster ", g, " - "), ""))), var.names[ind[1L]], " Variable, Factor ", ind[2L])))
         }
       }
 
       if(param == "uniquenesses") {
         plot.x <- x$Uniquenesses$psis[[g]]
         if(matx) {
-          if(mispal) grDevices::palette(viridis(var.pal, alpha=transparency))
+          if(mispal) grDevices::palette(viridis(var.pal, option="D", alpha=transparency))
           graphics::matplot(t(plot.x), type="l", ylab="", xlab="Iteration", lty=1, col=seq_along(grDevices::palette()))
           if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, "", paste0(":\nUniquenesses", ifelse(grp.ind, paste0(" - Cluster ", g), ""))))))
         } else   {
@@ -495,7 +495,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(param == "pis") {
         plot.x <- clust$pi.prop
         if(matx) {
-          if(mispal) grDevices::palette(viridis(max(G, 2L), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(max(G, 2L), option="D", alpha=transparency))
           graphics::matplot(t(plot.x), type="l", ylab="", xlab="Iteration", lty=1, col=seq_along(grDevices::palette()), ylim=c(0, 1))
           if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, "", paste0(":\nMixing Proportions")))))
         } else   {
@@ -539,7 +539,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(param == "means") {
         x.plot <- x$Means$mus[[g]]
         if(matx) {
-          if(mispal) grDevices::palette(viridis(var.pal, alpha=transparency))
+          if(mispal) grDevices::palette(viridis(var.pal, option="D", alpha=transparency))
           plot.x  <- tryCatch(apply(x.plot, 1L, stats::density, bw="SJ"), error = function(e) apply(x.plot, 1L, stats::density))
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
@@ -557,10 +557,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         x.plot <- x$Scores$eta
         if(by.fac) {
           plot.x  <- x.plot[,ind[2L],]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.obs)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.obs)), option="D", alpha=transparency))
         } else   {
           plot.x  <- if(Q > 1) x.plot[ind[1],rev(Qmseq),] else t(x.plot[ind[1L],rev(Qmseq),])
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q.max)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q.max)), option="D", alpha=transparency))
         }
         if(matx) {
           scols   <- seq_along(grDevices::palette())
@@ -576,7 +576,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         } else   {
           plot.d  <- tryCatch(stats::density(x.plot[ind[1L],ind[2L],], bw="SJ"), error = function(e) stats::density(x.plot[ind[1L],ind[2L],]))
           base::plot(plot.d, main="", ylab="", xlab="")
-          if(titles) graphics::title(main=list(paste0("Density", ifelse(all.ind, ":\n", ":\nScores - "), "Observation ", obs.names[ind[1L]], ", Factor ", ind[2L])))
+          if(titles) graphics::title(main=list(paste0("Density",   ifelse(all.ind, ":\n", ":\nScores - "), "Observation ", obs.names[ind[1L]], ", Factor ", ind[2L])))
           graphics::polygon(plot.d, col=grey, border=NA)
         }
       }
@@ -585,10 +585,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         x.plot <- x$Loadings$lmats[[g]]
         if(by.fac) {
           plot.x  <- x.plot[,ind[2L],]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.var)), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, n.var)), option="D", alpha=transparency))
         } else {
           plot.x  <- x.plot[ind[1L],rev(seq_len(Q)),]
-          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q)),     alpha=transparency))
+          if(mispal) grDevices::palette(viridis(min(10L, max(2L, Q)),     option="D", alpha=transparency))
         }
         if(matx) {
           lcols   <- seq_along(grDevices::palette())
@@ -604,7 +604,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         } else   {
           plot.d  <- tryCatch(stats::density(x.plot[ind[1L],ind[2L],], bw="SJ"), error = function(e) stats::density(x.plot[ind[1L],ind[2L],]))
           base::plot(plot.d, main="", ylab="", xlab="")
-          if(titles) graphics::title(main=list(paste0("Density", ifelse(all.ind, ":\n", paste0(":\nLoadings - ", ifelse(grp.ind, paste0("Cluster ", g, " - "), ""))), var.names[ind[1L]], " Variable, Factor ", ind[2L])))
+          if(titles) graphics::title(main=list(paste0("Density",   ifelse(all.ind, ":\n", paste0(":\nLoadings - ", ifelse(grp.ind, paste0("Cluster ", g, " - "), ""))), var.names[ind[1L]], " Variable, Factor ", ind[2L])))
           graphics::polygon(plot.d, col=grey, border=NA)
         }
       }
@@ -612,7 +612,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(param == "uniquenesses") {
         x.plot <- x$Uniquenesses$psis[[g]]
         if(matx) {
-          if(mispal) grDevices::palette(viridis(var.pal, alpha=transparency))
+          if(mispal) grDevices::palette(viridis(var.pal, option="D", alpha=transparency))
           plot.x  <- apply(x.plot, 1L, .logdensity, bw="SJ")
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
@@ -630,7 +630,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       if(param == "pis") {
         x.plot <- t(clust$pi.prop)
         if(matx) {
-          if(mispal) grDevices::palette(viridis(max(G, 2L), alpha=transparency))
+          if(mispal) grDevices::palette(viridis(max(G, 2L), option="D", alpha=transparency))
           plot.x  <- lapply(as.data.frame(x.plot), .logitdensity, bw="SJ")
           fitx    <- sapply(plot.x, "[[", "x")
           fity    <- sapply(plot.x, "[[", "y")
@@ -772,7 +772,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
           graphics::box(lwd=2)
           graphics::mtext(ifelse(Q.max > 1, "Factors", "Factor"), side=1, line=2)
         } else {
-          if((mispal && G >= 2)  || !z.miss) grDevices::palette(viridis(ifelse(z.miss, max(G, 2L), length(unique(labs))), alpha=transparency))
+          if((mispal && G >= 2)  || !z.miss) grDevices::palette(viridis(ifelse(z.miss, max(G, 2L), length(unique(labs))), option="D", alpha=transparency))
           col.s  <- if(is.factor(labs)) as.integer(levels(labs))[labs] else labs
           type.s <- ifelse(any(type.x, type == "l"), "p", type)
           if(ind2 != 1)  {
@@ -1005,7 +1005,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         graphics::axis(1, at=Q.plot, labels=names(plot.Q), tick=FALSE)
         graphics::axis(1, at=Median(Q.plot), labels="Q", tick=FALSE, line=1.5)
       } else {
-        if(mispal) grDevices::palette(viridis(max(G, 2L), alpha=transparency))
+        if(mispal) grDevices::palette(viridis(max(G, 2L), option="D", alpha=transparency))
         graphics::layout(1)
         graphics::par(mar=c(5.1, 4.1, 4.1, 2.1))
         plot.Q <- GQ.res$Q.Counts
@@ -1138,8 +1138,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         mind <- !is.null(prf) && !z.miss
       }
       if(g == 1) {
-        if(mispal) grDevices::palette(replace(viridis(8, alpha=transparency), 2, "red"))
-        col.x   <- if(mind) replace(rep(5, n.obs), prf$misclassified, 2) else c(5L, 2L)[(plot.x >= oneG) + 1L]
+        if(mispal) grDevices::palette(replace(viridis(8L, option="D", alpha=transparency), 2L, "red"))
+        col.x   <- if(mind) replace(rep(5L, n.obs), prf$misclassified, 2L) else c(5L, 2L)[(plot.x >= oneG) + 1L]
         if(type != "n") col.x[plot.x == 0] <- NA
         graphics::par(mar=c(5.1, 4.1, 4.1, 3.1))
         base::plot(plot.x, type=type, ylim=range(yax), col=col.x, yaxt="n", main="Clustering Uncertainty", ylab="Uncertainty", xlab="Observation", pch=ifelse(type == "n", NA, 16), lend=1)
@@ -1264,7 +1264,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
       plot.x <- if(param == "uniquenesses" && is.element(uni.type, c("isotropic", "single"))) plot.x else apply(plot.x, 2L, function(x) (x - min(x, na.rm=TRUE))/(max(x, na.rm=TRUE) - min(x, na.rm=TRUE)))
       varnam <- paste0(toupper(substr(param, 1L, 1L)), substr(param, 2L, nchar(param)))
       if(any(grp.ind, param == "loadings")) {
-        if(mispal) grDevices::palette(viridis(max(switch(EXPR=param, loadings=Q, G), 2L), alpha=transparency))
+        if(mispal) grDevices::palette(viridis(max(switch(EXPR=param, loadings=Q, G), 2L), option="D", alpha=transparency))
         graphics::layout(rbind(1, 2), heights=c(9, 1))
         graphics::par(mar=c(3.1, 4.1, 4.1, 2.1))
       }
@@ -1684,13 +1684,13 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #' @param show.plot Logical indicating whether the plot should be displayed (default = \code{TRUE}).
 #' @param type The type of plot to be drawn, as per \code{\link{plot}}. Defaults to \code{"h"}: histogram-like vertical lines.
 #'
-#' @details All arguments are vectorised. Users can also consult \code{\link{G_expected}} and \code{\link{G_variance}} in order to solicit sensible priors.
+#' @details All arguments are vectorised. Users can also consult \code{\link{G_expected}}, \code{\link{G_variance}}, and \code{\link{G_calibrate}} in order to solicit sensible priors.
 #' @note The actual density values are returned invisibly. Therefore, they can be visualised as desired by the user even if \code{show.plot} is \code{FALSE}.
 #'
 #' @return A plot of the prior distribution if \code{show.plot} is \code{TRUE}. Density values are returned invisibly. Note that the density values may not strictly sum to one in certain cases, as values small enough to be represented as zero may well be returned.
 #' @export
 #' @keywords plotting
-#' @seealso \code{\link{G_expected}}, \code{\link{G_variance}}, \code{\link[Rmpfr]{Rmpfr}}
+#' @seealso \code{\link{G_moments}}, \code{\link[Rmpfr]{Rmpfr}}
 #'
 #' @note Requires use of the \code{\link[Rmpfr]{Rmpfr}} and \code{gmp} libraries; may encounter difficulty and slowness for large \code{N}, especially with non-zero \code{discount} values. Despite the high precision arithmetic used, the functions can be unstable for small values of \code{discount}.
 #'
@@ -1719,7 +1719,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #'
 #' #' # Other special cases of the PYP are also facilitated
 #' # G_priorDensity(N=50, alpha=c(alpha, 27.1401, 0),
-#' #                discount=c(discount, -27.1401/100, 0.8054447), type="b")
+#' #                discount=c(discount, -27.1401/100, 0.8054448), type="b")
   G_priorDensity      <- function(N, alpha, discount = 0, show.plot = TRUE, type = "h") {
     igmp       <- isNamespaceLoaded("Rmpfr")
     mpfrind    <- suppressMessages(requireNamespace("Rmpfr", quietly=TRUE)) && .version_above("gmp", "0.5-4")
@@ -1763,6 +1763,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
     if(any(discount < 0  &
           (alpha   <= 0  |
        !.IntMult(alpha, discount))))  stop("'alpha' must be a positive integer multiple of 'abs(discount)' when 'discount' is negative", call.=FALSE)
+    if(any(alpha   == 0  &
+       discount    <= 0))             stop("'discount' must be strictly positive when 'alpha'=0",   call.=FALSE)
     if(length(alpha)    != max.len) {
       alpha    <- rep(alpha,    max.len)
     }
@@ -1781,16 +1783,16 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         rx[,i] <- gmp::asNumeric(abs(vnk    * Rmpfr::.bigz2mpfr(gmp::Stirling1.all(N))))
       } else    {
         if(disci > 0) {
-          vnk  <- c(Rmpfr::mpfr(0,         precBits=256),  cumsum(log(alphi + Nseq[-N]   * disci)))         -
+          vnk  <- c(Rmpfr::mpfr(0,         precBits=256),  cumsum(log(alphi + Nseq[-N]  * disci)))         -
                   log(Rmpfr::pochMpfr(alphi + 1, N - 1L)) - Nsq2 * log(disci)
         } else  {
           m    <- as.integer(alphi/abs(disci))
           mn   <- min(m, N)
           seqN <- seq_len(mn - 1L)
-          vnk  <- c(c(Rmpfr::mpfr(0,       precBits=256),  cumsum(log(m - seqN))  + seqN * log(abs(disci))) -
-                  log(Rmpfr::pochMpfr(alphi + 1, N - 1L)) - c(seqN, mn) * log(abs(disci)), rep(-Inf, N - mn))
+          vnk  <- c(c(Rmpfr::mpfr(0,       precBits=256),  cumsum(log(m - seqN)) + seqN * log(abs(disci))) -
+                  log(Rmpfr::pochMpfr(alphi + 1, N - 1L)) - c(seqN, mn) * log(abs(disci)),  rep(-Inf, N - mn))
         }
-        lnkd   <- lapply(Nseq, function(g) Rmpfr::sumBinomMpfr(g, f=function(k) Rmpfr::pochMpfr(-k * disci, N)))
+        lnkd   <- lapply(Nseq, function(g) Rmpfr::sumBinomMpfr(g, f=function(k) Rmpfr::pochMpfr(-k * disci, N), n0=1))
         rx[,i] <- gmp::asNumeric(exp(vnk    - lfactorial(Nsq2))  * abs(Rmpfr::mpfr2array(unlist(lnkd), dim=N)))
       }
     }
