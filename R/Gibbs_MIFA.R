@@ -5,7 +5,7 @@
 # Gibbs Sampler Function
   .gibbs_MIFA      <- function(Q, data, iters, N, P, G, sw, mu, mu.zero, uni.type, uni.prior,
                                sigma.mu, burnin, thinning, verbose, nu1, nu2, rho1, rho2, cluster,
-                               psi.alpha, psi.beta, adapt, start.AGS, stop.AGS, prop, b0, b1,
+                               psi.alpha, psi.beta, adapt, truncated, start.AGS, stop.AGS, prop, b0, b1,
                                cluster.shrink, beta.d1, beta.d2, epsilon, equal.pro, forceQg, ...) {
 
   # Define & initialise variables
@@ -55,6 +55,7 @@
     if(length(mu.zero)  == 1) {
       mu.zero      <- matrix(mu.zero, nrow=1L, ncol=G)
     }
+    mu.prior       <- mu.sigma * mu.zero
     z              <- cluster$z
     nn             <- tabulate(z, nbins=G)
     nn0            <- nn > 0
@@ -94,7 +95,15 @@
     Qmaxseq        <- seq_len(Qmax)
     eta            <- .sim_eta_p(N=N, Q=Qmax)
     phi            <- if(forceQg) lapply(Gseq, function(g) .sim_phi_p(Q=Qs[g], P=P, nu1=nu1, nu2=nu2)) else replicate(G, .sim_phi_p(Q=Q, P=P, nu1=nu1, nu2=nu2), simplify=FALSE)
-    delta          <- lapply(Gseq, function(g) c(if(!forceQg | Qs[g] > 0) .sim_delta_p(alpha=alpha.d1[g], beta=beta.d1), .sim_delta_p(Q=Qs[g], alpha=alpha.d2[g], beta=beta.d2)))
+    if(isTRUE(truncated))       {
+      .sim_deltak  <- .sim_deltaKT
+      .rdelta      <- rltrgamma
+      delta        <- lapply(Gseq, function(g) c(if(!forceQg | Qs[g] > 0) .sim_delta_p(alpha=alpha.d1[g], beta=beta.d1), .sim_deltaPT(Q=Qs[g], alpha=alpha.d2[g], beta=beta.d2)))
+      .sim_delta_p <- .sim_deltaPT
+    } else          {
+      .rdelta      <- stats::rgamma
+      delta        <- lapply(Gseq, function(g) c(if(!forceQg | Qs[g] > 0) .sim_delta_p(alpha=alpha.d1[g], beta=beta.d1), .sim_delta_p(Q=Qs[g], alpha=alpha.d2[g], beta=beta.d2)))
+    }
     tau            <- lapply(delta, cumprod)
     if(cluster.shrink)  {
       sig.store    <- matrix(0L, nrow=G, ncol=n.store)
@@ -158,7 +167,7 @@
       sum.data     <- vapply(dat.g, colSums2, numeric(P))
       sum.data     <- if(uni) t(sum.data) else sum.data
       sum.eta      <- lapply(eta.tmp, colSums2)
-      mu[,]        <- vapply(Gseq, function(g) if(nn0[g]) .sim_mu(mu.sigma=mu.sigma, psi.inv=psi.inv[,g], mu.zero=mu.zero[,g], sum.eta=sum.eta[[g]][seq_len(Qs[g])],
+      mu[,]        <- vapply(Gseq, function(g) if(nn0[g]) .sim_mu(mu.sigma=mu.sigma, psi.inv=psi.inv[,g], mu.prior=mu.prior[,g], sum.eta=sum.eta[[g]][seq_len(Qs[g])],
                              sum.data=sum.data[,g], lmat=lmat[[g]], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero[,g]), numeric(P))
 
     # Shrinkage
@@ -179,7 +188,8 @@
             }
           } else {
             if(Q0[g])   {
-              delta[[g]]    <- c(.sim_delta_p(alpha=ifelse(Q1g, alpha.d2[g], alpha.d1[g]), beta=ifelse(Q1g, beta.d2, beta.d1)), .sim_delta_p(Q=Qg, alpha=alpha.d2[g], beta=beta.d2))
+              delta[[g]]    <- c(stats::rgamma(n=1, shape=ifelse(Q1g, alpha.d2[g], alpha.d1[g]), rate=ifelse(Q1g, beta.d2, beta.d1)),
+                                 .sim_delta_p(Q=Qg, alpha=alpha.d2[g], beta=beta.d2))
               tau[[g]]      <- cumprod(delta[[g]])
             }
           }
@@ -229,10 +239,10 @@
               }
             }
           }
-          phi[nn0]          <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) cbind(phi[[g]][,seq_len(Qs.old[h])],  .rgamma0(n=P, shape=nu1, rate=nu2)) else phi[[g]][,nonred[[h]], drop=FALSE])
-          delta[nn0]        <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) c(delta[[g]][seq_len(Qs.old[h])],     stats::rgamma(n=1, shape=alpha.d2, rate=beta.d2)) else delta[[g]][nonred[[h]]])
+          phi[nn0]          <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) cbind(phi[[g]][,seq_len(Qs.old[h])],  .rgamma0(n=P, shape=nu1,         rate=nu2))     else phi[[g]][,nonred[[h]], drop=FALSE])
+          delta[nn0]        <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) c(delta[[g]][seq_len(Qs.old[h])],     .rdelta(n=1,  shape=alpha.d2[g], rate=beta.d2)) else delta[[g]][nonred[[h]]])
           tau[nn0]          <- lapply(delta[nn.ind], cumprod)
-          lmat[nn0]         <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) cbind(lmat[[g]][,seq_len(Qs.old[h])], stats::rnorm(n=P, mean=0, sd=sqrt(1/(phi[[g]][,Qs[g]] * tau[[g]][Qs[g]] * MGPsig[g])))) else lmat[[g]][,nonred[[h]], drop=FALSE])
+          lmat[nn0]         <- lapply(nn.ind, function(g, h=which(nn.ind == g)) if(notred[h]) cbind(lmat[[g]][,seq_len(Qs.old[h])], stats::rnorm(n=P, mean=0, sd=1/sqrt(phi[[g]][,Qs[g]] * tau[[g]][Qs[g]] * MGPsig[g]))) else lmat[[g]][,nonred[[h]], drop=FALSE])
           Qemp     <- Qs[!nn0]
           Qpop     <- Qs[nn0]
           Qmax     <- max(Qpop)
@@ -249,14 +259,14 @@
                 lmat[[g]]   <- lmat[[g]][,Qmaxseq, drop=FALSE]
               } else {
                 while(Qg    != Qmax)   {
-                 phi[[g]]   <- cbind(phi[[g]],  .rgamma0(n=P, shape=nu1, rate=nu2))
-                 delta[[g]] <- c(delta[[g]],    stats::rgamma(n=1, shape=alpha.d2, rate=beta.d2))
+                 phi[[g]]   <- cbind(phi[[g]],  .rgamma0(n=P, shape=nu1,         rate=nu2))
+                 delta[[g]] <- c(delta[[g]],    .rdelta(n=1,  shape=alpha.d2[g], rate=beta.d2))
                  tau[[g]]   <- cumprod(delta[[g]])
                  if(store.eta)         {
                   eta.tmp[[g]]   <- cbind(eta.tmp[[g]], base::matrix(0L, nrow=n.eta[g], ncol=1L))
                  }
                  Qg         <- Qg + 1L
-                 lmat[[g]]  <- cbind(lmat[[g]], stats::rnorm(n=P, mean=0, sd=sqrt(1/(phi[[g]][,Qg] * tau[[g]][Qg] * MGPsig[g]))))
+                 lmat[[g]]  <- cbind(lmat[[g]], stats::rnorm(n=P, mean=0, sd=1/sqrt(phi[[g]][,Qg] * tau[[g]][Qg] * MGPsig[g])))
                 }
               }
             }
@@ -281,12 +291,12 @@
           if(length(unique(Qs)) != 1) {
             Qs[left]        <- Qs[right]
           }
-          mu[,left]         <- mu[,right, drop=FALSE]
+          mu[,left]         <- mu[,right,       drop=FALSE]
           lmat[left]        <- lmat[right]
           delta[left]       <- delta[right]
           phi[left]         <- phi[right]
           tau[left]         <- tau[right]
-          psi.inv[,left]    <- psi.inv[,right, drop=FALSE]
+          psi.inv[,left]    <- psi.inv[,right,  drop=FALSE]
           pi.prop[left]     <- pi.prop[right]
           nn[left]          <- nn[right]
           Q0[left]          <- Q0[right]
@@ -298,7 +308,8 @@
             n.eta[left]     <- n.eta[right]
           }
           if(mu0g)           {
-            mu.zero[,left]  <- mu.zero[,right, drop=FALSE]
+            mu.zero[,left]  <- mu.zero[,right,  drop=FALSE]
+            mu.prior[,left] <- mu.prior[,right, drop=FALSE]
           }
           if(psi0g)          {
             psi.beta[,left] <- psi.beta[,right, drop=FALSE]

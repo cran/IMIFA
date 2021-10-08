@@ -20,7 +20,7 @@
 #' For the \code{"OMFA"}, and \code{"OMIFA"} models this upper limit remains fixed for the entire length of the chain; the upper limit for the for the \code{"IMFA"} and \code{"IMIFA"} models can be specified via \code{trunc.G} (see \code{\link{bnpControl}}), which must satisfy \code{range.G <= trunc.G < N}.
 #'
 #' If \code{length(range.G) * length(range.Q)} is large, consider not storing unnecessary parameters (via \code{\link{storeControl}}), or breaking up the range of models to be explored into chunks and sending each chunk to \code{\link{get_IMIFA_results}} separately.
-#' @param range.Q Depending on the method employed, either the range of values for the number of latent factors, or, for methods ending in IFA the conservatively high starting value for the number of cluster-specific factors, in which case the default starting value is \code{round(3 * log(P))}.
+#' @param range.Q Depending on the method employed, either the range of values for the number of latent factors or, for methods ending in IFA, the conservatively high starting value for the number of cluster-specific factors, in which case the default starting value is \code{round(3 * log(P))}.
 #'
 #' For methods ending in IFA, different clusters can be modelled using different numbers of latent factors (incl. zero); for methods not ending in IFA it is possible to fit zero-factor models, corresponding to simple diagonal covariance structures. For instance, fitting the \code{"IMFA"} model with \code{range.Q=0} corresponds to a vanilla Pitman-Yor / Dirichlet Process Mixture Model.
 #'
@@ -304,8 +304,9 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
              verbose))              message("Forced non-storage of mixing proportions as 'equal.pro' is TRUE\n")
       storage["pi.sw"]    <- FALSE
     }
-    if(G.x)                         stop("'range.G' must be specified",         call.=FALSE)
-    if(any(range.G  < 1))           stop("'range.G' must be strictly positive", call.=FALSE)
+    if(G.x)                         stop("'range.G' must be specified",                   call.=FALSE)
+    if(any(floor(range.G) != range.G)  ||
+       any(range.G  < 1))           stop("'range.G' must be a strictly positive integer", call.=FALSE)
     range.G <- G.init     <- sort(unique(range.G))
     meth    <- rep(method, length(range.G))
   }
@@ -401,13 +402,15 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
       !missing(MGP)        ||
       any(!unlist(mgpmiss)))        message(paste0("'mgpControl()' parameters not necessary for the ", method, " method\n"))
    if(Q.miss)                       stop("'range.Q' must be specified", call.=FALSE)
-   if(any(range.Q   < 0))           stop(paste0("'range.Q' must be non-negative for the ", method, " method"), call.=FALSE)
+   if(any(floor(range.Q)   != range.Q) ||
+      any(range.Q   < 0))           stop(paste0("'range.Q' must be a non-negative integer for the ", method, " method"), call.=FALSE)
    range.Q  <- sort(unique(range.Q))
    delta0g  <- FALSE
   } else {
    fQ0      <- uni || P    == 2
    MGP$prop <- ifelse(fQ0  && mgpmiss$propx, 0.5, floor(MGP$prop * P)/P)
    adapt    <- MGP$adapt
+   truncate <- MGP$truncated
    delta0g  <- MGP$delta0g && method   == "MIFA"
    MGP$nu1  <- nu1         <- MGP$phi.hyper[1L]
    MGP$nu2  <- nu2         <- MGP$phi.hyper[2L]
@@ -705,8 +708,8 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   if(is.element(method, c("classify", "IFA", "MIFA", "IMIFA", "OMIFA"))) {
     ad1uu          <- unique(unlist(alpha.d1))
     ad2uu          <- unique(unlist(alpha.d2))
-    check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, bd1=MGP$beta.d1, bd2=MGP$beta.d2))
-   #check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, bd1=MGP$beta.d1, bd2=MGP$beta.d2, SIGMA.shape=MGP$omega1, SIGMA.rate=MGP$omega2))
+    check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, truncated=truncate, bd1=MGP$beta.d1, bd2=MGP$beta.d2))
+   #check.mgp      <- suppressWarnings(MGP_check(ad1=ad1uu, ad2=ad2uu, Q=unique(range.Q), phi.shape=nu1, phi.rate=nu2, sigma.shape=rho1, sigma.rate=rho2, truncated=truncate, bd1=MGP$beta.d1, bd2=MGP$beta.d2, SIGMA.shape=MGP$omega1, SIGMA.rate=MGP$omega2))
     if(!all(check.mgp$valid))       stop("Invalid shrinkage hyperparameter values WILL NOT encourage loadings column removal.\nTry using the MGP_check() function in advance to ensure the cumulative shrinkage property holds.", call.=FALSE)
     if(any(attr(check.mgp, "Warning"))) {
       if(any(ad2uu <= ad1uu))       warning("Column shrinkage hyperparameter values MAY NOT encourage loadings column removal.\n'alpha.d2' should be moderately large relative to 'alpha.d1'\n", call.=FALSE, immediate.=TRUE)
@@ -875,6 +878,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   class(times)            <- "listof"
  #attr(imifa, "Thresh")   <- BNP$thresh
   attr(imifa, "Time")     <- if(is.element(method, c("FA", "IFA", "classify"))) times[-length(times)] else times
+  attr(imifa, "Truncate") <- is.element(method, c("classify", "IFA", "MIFA", "OMIFA", "IMIFA")) && isTRUE(truncate)
   attr(imifa, "TuneZeta") <- is.element(method, c("IMFA", "IMIFA", "OMFA", "OMIFA")) && tune.zeta$do
   attr(imifa, "Uni.Meth") <- c(Uni.Prior = uni.prior, Uni.Type = uni.type)
   attr(imifa, "Varnames") <- varnames

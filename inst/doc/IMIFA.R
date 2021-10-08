@@ -1,8 +1,8 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(fig.width=7, fig.height = 5, fig.align = 'center', 
-                      fig.show='hold', warning=FALSE, 
+                      fig.show='hold', warning=FALSE,
                       message=FALSE, progress=FALSE, 
-                      collapse=TRUE, comments="#>")
+                      collapse=TRUE, comment="#>")
 
 if(isTRUE(capabilities("cairo"))) {
   knitr::opts_chunk$set(dev.args=list(type="cairo"))

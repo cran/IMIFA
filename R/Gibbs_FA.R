@@ -44,15 +44,16 @@
 
     mu.sigma     <- 1/sigma.mu
     mu.zero      <- as.numeric(mu.zero)
+    mu.prior     <- mu.sigma * as.numeric(mu.zero)
     uni.type     <- switch(EXPR=uni.type,  unconstrained=,               constrained="constrained", "single")
     .sim_psi_inv <- switch(EXPR=uni.type,  constrained=.sim_psi_u1,      single=.sim_psi_c1)
     .sim_psi_ip  <- switch(EXPR=uni.prior, unconstrained=.sim_psi_ipu,   isotropic=.sim_psi_ipc)
     psi.beta     <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
     uni.shape    <- switch(EXPR=uni.type,  constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
     V            <- switch(EXPR=uni.type,  constrained=P,                single=1L)
-   #eta          <- if(hetero) .sim_het_p(Q=Q, N=N, eta.shape=eta.shape, eta.rate=eta.rate) else .sim_eta_p(Q=Q, N=N)
-    eta          <- .sim_eta_p(Q=Q, N=N)
-    lmat         <- matrix(.sim_load_p(Q=Q, P=P, sigma.l=sigma.l), nrow=P, ncol=Q)
+   #eta          <- if(hetero) .sim_het_p(N=N, Q=Q, eta.shape=eta.shape, eta.rate=eta.rate) else .sim_eta_p(N=N, Q=Q)
+    eta          <- .sim_eta_p(N=N, Q=Q)
+    lmat         <- matrix(.sim_load_p(Q=Q, P=P, sig.l.sqrt=sqrt(sigma.l)), nrow=P, ncol=Q)
     psi.inv      <- .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta)
     psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
     max.p        <- (psi.alpha  - 1)/psi.beta
@@ -85,7 +86,7 @@
       psi.inv[]  <- .sim_psi_inv(uni.shape, psi.beta, S.mat, V)
 
     # Means
-      mu[]       <- .sim_mu(N=N, P=P, mu.sigma=mu.sigma, psi.inv=psi.inv, sum.data=sum.data, sum.eta=colSums2(eta), lmat=lmat, mu.zero=mu.zero)
+      mu[]       <- .sim_mu(N=N, P=P, mu.sigma=mu.sigma, psi.inv=psi.inv, sum.data=sum.data, sum.eta=colSums2(eta), lmat=lmat, mu.prior=mu.prior)
 
       if(storage) {
         if(verbose) utils::setTxtProgressBar(pb, iter)

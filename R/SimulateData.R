@@ -29,7 +29,7 @@
 #' @export
 #' @references Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
 #' @keywords utility
-#' @importFrom Rfast "is.symmetric"
+#' @importFrom Rfast "is.symmetric" "matrnorm"
 #' @name sim_IMIFA
 #' @rdname sim_IMIFA
 #'
@@ -131,7 +131,7 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
     if(anyNA(musup))                      stop("Missing values are not allowed in 'mu'",  call.=FALSE)
   } else {
     if(!is.numeric(loc.diff))             stop("'loc.diff' must be numeric", call.=FALSE)
-    musup      <- as.integer(scale(Gseq, center=TRUE, scale=FALSE)) * loc.diff
+    musup      <- (Gseq  - (G + 1)/2) * loc.diff
   }
   if(!(psimiss <- missing(psi)))      {
     psisup     <- matrix(.len_check(as.matrix(psi), switch0g = TRUE, method = ifelse(G > 1, "MFA", "FA"), P, G)[[1L]], nrow=P, ncol=G, byrow=length(psi) == G)
@@ -139,7 +139,7 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
   }
   if(!(smiss   <- missing(scores))   &&
      method    == "conditional")      {
-    if(!is.matrix(scores)  ||
+    if(!is.matrix(scores)    ||
        !is.numeric(scores))               stop("Invalid 'scores' supplied: must be a numeric matrix", call.=FALSE)
     if(anyNA(scores))                     stop("Missing values are not allowed in 'scores'", call.=FALSE)
   }
@@ -207,25 +207,25 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
   true.zlab    <- factor(rep(Gseq, nn), labels=Gseq[nn > 0])
   if(method    == "conditional")   {
     Q.max      <- max(Q)
-    eta.true   <- if(smiss) .sim_eta_p(Q=Q.max, N=N) else scores
+    eta.true   <- if(smiss) .sim_eta_p(N=N, Q=Q.max)          else scores
     if(nrow(eta.true) != N ||
        ncol(eta.true) != Q.max)           stop(paste0("The 'scores' matrix must have N=", N, " rows and max(Q)=", Q.max, " columns"), call.=FALSE)
   } else if(!smiss)                       message("True 'scores' need not be supplied when 'method=\"marginal\"'\n")
   for(g in Gseq)       {
     Q.g        <- Q[g]
     N.g        <- nn[g]
-    mu.true    <- stats::setNames(if(mumiss) .sim_mu_p(P=P, mu.zero=musup[g], sig.mu.sqrt=1)     else musup[,g],  vnames)
+    mu.true    <- stats::setNames(if(mumiss) .sim_mu_p(P=P, mu.zero=musup[g], sig.mu.sqrt=1)                else musup[,g],  vnames)
     if(lammiss && !nzmiss)   {
       neff     <- non.zero[[g]]
       l.true   <- base::matrix(0L, nrow=P, ncol=Q.g)
       for(k in seq_len(Q.g)) {
         lind   <- sample(Pseq, neff[k], replace=FALSE)
-        l.true[lind,k] <- .sim_load_p(Q=1L, P=neff[k], sigma.l=1)
+        l.true[lind,k] <- .sim_load_p(Q=1L, P=neff[k], sig.l.sqrt=1)
       }
     } else      {
-      l.true   <- if(lammiss) base::matrix(.sim_load_p(Q=Q.g, P=P, sigma.l=1), nrow=P, ncol=Q.g) else lmat[[g]]
+      l.true   <- if(lammiss) base::matrix(.sim_load_p(Q=Q.g, P=P, sig.l.sqrt=1), nrow=P, ncol=Q.g)         else lmat[[g]]
     }
-    psi.true   <- stats::setNames(if(psimiss) 1/stats::rgamma(P, shape=2, rate=1)                else psisup[,g], vnames)
+    psi.true   <- stats::setNames(if(psimiss) 1/stats::rgamma(P, shape=2, rate=1)                           else psisup[,g], vnames)
 
   # Simulate data
     covmat     <- provideDimnames({ if(P > 1) diag(psi.true) else as.matrix(psi.true) } + { if(Q.g > 0) switch(EXPR=method, marginal=tcrossprod(l.true), 0L) else 0L}, base=list(vnames))
@@ -313,5 +313,5 @@ sim_IMIFA_data <- function(N = 300L, G = 3L, P = 50L, Q = rep(floor(log(P)), G),
                      loadings = res$Loadings$post.load,
                      scores   = res$Scores$post.eta,
                      method   = meth,
-                     forceQg   = FALSE)))
+                     forceQg  = FALSE)))
   }
