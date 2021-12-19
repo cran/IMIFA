@@ -1,4 +1,4 @@
-#' Adaptive Gibbs Sampler for Nonparameteric Model-based Clustering using models from the IMIFA family
+#' Adaptive Gibbs Sampler for Nonparametric Model-based Clustering using models from the IMIFA family
 #'
 #' Carries out Gibbs sampling for all models from the IMIFA family, facilitating model-based clustering with dimensionally reduced factor-analytic covariance structures, with automatic estimation of the number of clusters and cluster-specific factors as appropriate to the method employed. Factor analysis with one group (FA/IFA), finite mixtures (MFA/MIFA), overfitted mixtures (OMFA/OMIFA), infinite factor models which employ the multiplicative gamma process (MGP) shrinkage prior (IFA/MIFA/OMIFA/IMIFA), and infinite mixtures which employ Pitman-Yor / Dirichlet Process Mixture Models (IMFA/IMIFA) are all provided.
 #'
@@ -141,7 +141,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   }
   if(!all(is.character(method)))    stop("'method' must be a character vector of length 1", call.=FALSE)
   method    <- match.arg(method)
-  if(missing(dat))                  stop("Dataset must be supplied", call.=FALSE)
+  if(missing(dat))                  stop("Data set must be supplied", call.=FALSE)
   dat.nam   <- gsub("[[:space:]]", "", deparse(substitute(dat)))
 
 # Remove non-numeric columns & apply centering & scaling if necessary
@@ -200,12 +200,12 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
   uni.type  <- ifelse(miss.uni, ifelse(uni, "isotropic", "unconstrained"), mixFA$uni.type)
   if(uni    && is.element(uni.type, c("unconstrained", "constrained"))) {
     uni.type     <- switch(EXPR=uni.type, unconstrained=, isotropic="isotropic", constrained=, single="single")
-    if(isTRUE(verbose))             message(paste0("'uni.type' coerced to ", uni.type, " as the dataset is univariate\n"))
+    if(isTRUE(verbose))             message(paste0("'uni.type' coerced to ", uni.type, " as the data set is univariate\n"))
   }
   uni.prior <- ifelse(miss.pri, switch(EXPR=uni.type, constrained=, unconstrained="unconstrained", "isotropic"), mixFA$uni.prior)
   if(uni    && uni.prior  == "unconstrained") {
     uni.prior    <- "isotropic"
-    if(isTRUE(verbose))             message("'uni.prior' coerced to isotropic as the dataset is univariate\n")
+    if(isTRUE(verbose))             message("'uni.prior' coerced to isotropic as the data set is univariate\n")
   }
   if(all(is.element(uni.type, c("isotropic", "single")),
      uni.prior == "unconstrained")) stop("'uni.prior' can only be 'unconstrained' when 'uni.type' is 'unconstrained' or 'constrained'", call.=FALSE)
@@ -352,6 +352,17 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
       }
       if(all(!bnpmiss$IM.lab.sw, IM.lab.sw, !learn.a,
              verbose, !learn.d))    message("May not be necessary to set 'IM.lab.sw' to TRUE when neither 'alpha' nor 'discount' are being learned\n")
+      if(all(BNP$exchange,
+             IM.lab.sw))         {
+        if(verbose)                 message("'IM.lab.sw' forced to FALSE as 'exchange' is TRUE\n")
+        IM.lab.sw  <-
+        BNP$IM.lab.sw        <- FALSE
+      }
+      if(all(any(BNP$exchange, BNP$thresh),
+             BNP$ind.slice))     {
+        if(verbose)                 message("'ind.slice' forced to FALSE as 'exchange' &/or 'thresh' is TRUE\n")
+        BNP$ind.slice        <- FALSE
+      }
     } else BNP$a.hyper[2L]   <- BNP$a.hyper[2L] * G.init
   }
 
@@ -416,7 +427,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
    MGP$nu2  <- nu2         <- MGP$phi.hyper[2L]
    MGP$rho1 <- rho1        <- if(MGP$cluster.shrink && method != "IFA") MGP$sigma.hyper[1L]
    MGP$rho2 <- rho2        <- if(MGP$cluster.shrink && method != "IFA") MGP$sigma.hyper[2L]
-  #if((!mgpmiss$global.shrink          &&
+  #if((!mgpmiss$global.shrinkx         &&
   #   !MGP$global.shrink)  &&
   #   (MGP$cluster.shrink  &&
   #  method == "IFA"))              warning("'global.shrink' invoked as 'cluster.shrink' is TRUE and the IFA method is used", call.=FALSE, immediate.=TRUE)
@@ -426,14 +437,14 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
    alpha.d1 <- .len_check(MGP$alpha.d1, delta0g, method, P, G.init, P.dim=FALSE)
    alpha.d2 <- .len_check(MGP$alpha.d2, delta0g, method, P, G.init, P.dim=FALSE)
    MGP      <- MGP[-seq_len(5L)]
-   start.AGS       <-  MGP$start.AGS   <- ifelse(mgpmiss$startAGSx, ifelse(fQ0, 0L, switch(EXPR=method, IFA=, MIFA=burnin, 0L)), MGP$start.AGS)
+   start.AGS       <-  MGP$start.AGS   <- ifelse(mgpmiss$startAGSx, pmin(burnin, ifelse(fQ0, 2L, switch(EXPR=method, IFA=, MIFA=burnin, 2L))), MGP$start.AGS)
    if(Q.miss)                range.Q   <- as.integer(ifelse(fQ0, 1L, min(ifelse(P > 500, 12L + round(log(P)), round(3 * log(P))), N - 1L, P - 1L)))
    if(length(range.Q)       > 1)    stop(paste0("Only one starting value for 'range.Q' can be supplied for the ", method, " method"), call.=FALSE)
    if(range.Q      <= 0)            stop(paste0("'range.Q' must be strictly positive for the ", method, " method"), call.=FALSE)
    if(isTRUE(adapt))  {
      if(start.AGS     > burnin)     stop("'start.AGS' must be <= 'burnin' if 'adapt' is TRUE", call.=FALSE)
      if(MGP$stop.AGS <= start.AGS)  stop(paste0("'stop.AGS' must be greater than 'start.AGS' (=", start.AGS, ")"),  call.=FALSE)
-     if(!mgpmiss$stopAGS   && verbose  &&
+     if(!mgpmiss$stopAGSx  && verbose  &&
         MGP$stop.AGS >= n.iters)    message("'stop.AGS' not invoked as it is not less than 'n.iters'\n")
      if(Q.min   > range.Q)          stop(paste0("'range.Q' must be at least min(log(P), log(N)) for the ", method, " method when 'adapt' is TRUE"), call.=FALSE)
     } else if(!fQ0 && is.element(method,
@@ -843,7 +854,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
        "Disc.step")       <- is.element(method, c("IMFA", "IMIFA"))    && learn.d
   attr(imifa, "Discount") <- if(is.element(method, c("IMFA", "IMIFA")) && !learn.d) discount
   attr(imifa, "Equal.Pi") <- equal.pro
- #attr(imifa, "Exchange") <- BNP$exchange
+  attr(imifa, "Exchange") <- BNP$exchange
   attr(imifa, "Factors")  <- range.Q
   attr(imifa, "ForceQg")  <- MGP$forceQg && is.element(method, c("MIFA", "OMIFA", "IMIFA"))
   attr(imifa, "G.init")   <- G.init
@@ -876,7 +887,7 @@ mcmc_IMIFA  <- function(dat, method = c("IMIFA", "IMFA", "OMIFA", "OMFA", "MIFA"
     times                 <- times[-2L]
   }
   class(times)            <- "listof"
- #attr(imifa, "Thresh")   <- BNP$thresh
+  attr(imifa, "Thresh")   <- BNP$thresh
   attr(imifa, "Time")     <- if(is.element(method, c("FA", "IFA", "classify"))) times[-length(times)] else times
   attr(imifa, "Truncate") <- is.element(method, c("classify", "IFA", "MIFA", "OMIFA", "IMIFA")) && isTRUE(truncate)
   attr(imifa, "TuneZeta") <- is.element(method, c("IMFA", "IMIFA", "OMFA", "OMIFA")) && tune.zeta$do

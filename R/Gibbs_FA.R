@@ -51,7 +51,10 @@
     psi.beta     <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
     uni.shape    <- switch(EXPR=uni.type,  constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
     V            <- switch(EXPR=uni.type,  constrained=P,                single=1L)
-   #eta          <- if(hetero) .sim_het_p(N=N, Q=Q, eta.shape=eta.shape, eta.rate=eta.rate) else .sim_eta_p(N=N, Q=Q)
+   #if(hetero)       {
+   #  eta.sig    <- .rgamma0(Q, shape=eta.shape, rate=eta.rate)
+   #  eta        <- .sim_het_p(N=N, Q=Q, eta.sig=eta.sig)
+   #} else eta   <- .sim_eta_p(N=N, Q=Q)
     eta          <- .sim_eta_p(N=N, Q=Q)
     lmat         <- matrix(.sim_load_p(Q=Q, P=P, sig.l.sqrt=sqrt(sigma.l)), nrow=P, ncol=Q)
     psi.inv      <- .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta)

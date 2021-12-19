@@ -780,7 +780,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       post.load  <- rowMeans(lmat, dims=2)
       var.load   <- apply(lmat, c(1L, 2L), Var)
       ci.load    <- apply(lmat, c(1L, 2L), stats::quantile, conf.levels)
-      var.exp    <- rowSums2(post.load * post.load)
+      var.exp    <- rowSums2(post.load^2)
       class(post.load)     <- "loadings"
     } else if(sw["psi.sw"]) {
       if(sizes[g] > 1) {
@@ -884,7 +884,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       orig.data  <- as.data.frame(dat)
       Pseq       <- seq_len(n.var)
       if(is.null(dots$dbreaks)) {
-        xbins    <- if(isFALSE(uni)) lengths(sapply(orig.data, function(x) suppressWarnings(graphics::hist(x, plot=FALSE, ...))$counts)) else length(graphics::hist(orig.data[[1L]], plot=FALSE, ...)$counts)
+        xbins    <- if(isFALSE(uni)) lengths(lapply(orig.data, function(x) suppressWarnings(graphics::hist(x, plot=FALSE, ...))$counts)) else length(graphics::hist(orig.data[[1L]], plot=FALSE, ...)$counts)
         dbreaks  <- lapply(Pseq,  function(p) c(-Inf, as.numeric(sub("\\((.+),.*", "\\1", levels(cut(orig.data[[p]], xbins[p]))[-1L])), Inf))
       } else        {
         dbreaks  <- dots$dbreaks
@@ -897,7 +897,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
       }
       dcounts    <- mapply(tabulate, mapply(cut, orig.data, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
       nbins      <- max(xbins)
-      dat.bins   <- sapply(dcounts, .padding, nbins)
+      dat.bins   <- vapply(dcounts, .padding, integer(nbins), nbins)
       datnorm    <- norm(dat.bins, dots$type)
       rcounts    <- vector("list", e.store)
     } else if(Q0X)  {             warning("Need the means and uniquenesses to have been stored for zero-factor models in order to compute the posterior predictive reconstruction error\n", call.=FALSE)
@@ -927,9 +927,10 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
         Q0Er     <- Q0E[,r]
         if(frobenius)   {
           if(inf.Q) QsEr       <- QsE[,r]
-          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, nn=tab.z[r,], mu=mu2[,,r], psi=psi2[,,r], method="marginal", forceQg=FALSE, loadings=if(!all(Q0Er)) lapply(Gseq, function(g) as.matrix(lmat2[,if(inf.Q) seq_len(QsEr[g]) else Qseq,g,r]))))
+          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, nn=tab.z[r,], mu=mu2[,,r], psi=psi2[,,r], method="marginal", forceQg=FALSE,
+                                                    loadings=if(!all(Q0Er)) lapply(Gseq, function(g) matrix(lmat2[,if(inf.Q) seq_len(QsEr[g]) else Qseq,g,r], nrow=n.var, ncol=QsEr[g]))))
           rbinsx <- mapply(tabulate, mapply(cut, rdat, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
-          rbins  <- sapply(rbinsx, .padding, nbins)
+          rbins  <- vapply(rbinsx, .padding, integer(nbins), nbins)
           Frob   <- norm(dat.bins - rbins, dots$type)
           rFro   <- norm(rbins, dots$type)
           minF   <- abs(datnorm - rFro)
@@ -941,7 +942,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
           b      <- Reduce("+", lapply(Gseq, function(g) pi2[g,r]   * mu2[,g,r]))
           Sigma  <- a - tcrossprod(b)
           error  <- cov.emp - Sigma
-          sqerr  <- error   * error
+          sqerr  <- error^2
           abserr <- abs(error)
           mse[r]       <- mean(sqerr)
           medse[r]     <- Median(sqerr)
@@ -982,9 +983,10 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
             QsEr <- QsE[r]
             QsMs <- seq_len(QsEr)
           }
-          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, mu=mu2[,r], psi=psi2[,r], method="marginal", forceQg=FALSE, loadings=if(!Q0E[r]) as.matrix(lmat2[,QsMs,r])))
+          rdat   <- suppressWarnings(sim_IMIFA_data(N=n.obs, G=G, P=n.var, Q=QsEr, mu=mu2[,r], psi=psi2[,r], method="marginal", forceQg=FALSE,
+                                                    loadings=if(!Q0E[r]) matrix(lmat2[,QsMs,r], nrow=n.var, ncol=QsEr)))
           rbinsx <- mapply(tabulate, mapply(cut, rdat, dbreaks, SIMPLIFY=FALSE), xbins, SIMPLIFY=FALSE)
-          rbins  <- sapply(rbinsx, .padding, nbins)
+          rbins  <- vapply(rbinsx, .padding, integer(nbins), nbins)
           Frob   <- norm(dat.bins - rbins, dots$type)
           rFro   <- norm(rbins, dots$type)
           minF   <- abs(datnorm - rFro)
@@ -994,7 +996,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
         if(cov.met) {
           Sigma  <- diag(psi2[,r,      drop=!uni]) + (if(Q0E[r]) 0L else  if(uni)         crossprod(lmat2[,,r])    else tcrossprod(lmat2[,,r]))
           error  <- cov.emp - Sigma
-          sqerr  <- error   * error
+          sqerr  <- error^2
           abserr <- abs(error)
           mse[r]      <- mean(sqerr)
           medse[r]    <- Median(sqerr)
@@ -1022,7 +1024,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
        cov.est   <- as.matrix(cov.est)
        dimnames(cov.est)       <- list(varnames, varnames)
        err       <- cov.emp - cov.est
-       sqerr     <- err     * err
+       sqerr     <- err^2
        abserr    <- abs(err)
        mse2      <- mean(sqerr)
        rmse2     <- sqrt(mse2)
@@ -1035,8 +1037,8 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
        metrics   <- metrics[!rowAll(is.na(metrics)),, drop=FALSE]
        metricCI  <- rowQuantiles(metrics, probs=conf.levels)
        metricCI  <- if(cov.met && sw.pi) metricCI                   else provideDimnames(t(metricCI), base=list("PPRE", names(metricCI)))
-       med.met   <- stats::setNames(rowMedians(metrics), rownames(metrics))
-       mean.met  <- stats::setNames(rowMeans2(metrics),  rownames(metrics))
+       med.met   <- stats::setNames(matrixStats::rowMedians(metrics), rownames(metrics))
+       mean.met  <- stats::setNames(rowMeans2(metrics),               rownames(metrics))
        last.met  <- c(MSE = mse[e.store], MEDSE = medse[e.store], MAE = mae[e.store], MEDAE = medae[e.store], RMSE = rmse[e.store], NRMSE = nrmse[e.store])
        last.met  <- if(frobenius) c(last.met, PPRE = Fro[e.store])  else last.met
        last.met  <- last.met[!is.na(last.met)]
@@ -1084,7 +1086,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   attr(result, "Discount")     <- if(is.element(method, c("IMFA", "IMIFA")) && !learn.d) attr(sims, "Discount")
   attr(result, "Errors")       <- errs
   attr(result, "Equal.Pi")     <- equal.pro
- #attr(result, "Exchange")     <- attr(sims, "Exchange")
+  attr(result, "Exchange")     <- attr(sims, "Exchange")
   attr(result, "ForceQg")      <- attr(sims, "ForceQg")
   attr(result, "G.init")       <- if(inf.G) attr(sims, "G.init")
   attr(result, "G.Mean")       <- attr(sims, "G.Mean")
@@ -1094,7 +1096,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   attr(result, "Ind.Slice")    <- if(is.element(method, c("IMFA", "IMIFA"))) attr(sims, "Ind.Slice")
   attr(result, "Kappa0")       <- attr(sims, "Kappa0")
   attr(result, "Method")       <- method
-  attr(result, "N.Loadstore")  <- if(inf.Q) vapply(Lstore, length, numeric(1L)) else rep(TN.store, G)
+  attr(result, "N.Loadstore")  <- if(inf.Q) lengths(Lstore) else rep(TN.store, G)
   attr(result, "Name")         <- data.name
   attr(result, "N.Store")      <- TN.store
   attr(result, "Nowarn.G")     <- ifelse(inf.G || length(n.grp) == 1, TRUE,
@@ -1113,7 +1115,7 @@ get_IMIFA_results.IMIFA        <- function(sims = NULL, burnin = 0L, thinning = 
   attr(result, "Sd0.drop")     <- attr(sims, "Sd0.drop")
   attr(result, "Store")        <- tmp.store
   attr(result, "Switch")       <- sw
- #attr(result, "Thresh")       <- attr(sims, "Thresh")
+  attr(result, "Thresh")       <- attr(sims, "Thresh")
   attr(result, "Truncated")    <- attr(sims, "Truncate")
   attr(result, "TuneZeta")     <- attr(sims, "TuneZeta")
   attr(result, "Uni.Meth")     <- uni.meth

@@ -31,7 +31,7 @@
     }
 
     #.sim_eta_sig <- function(N, Q, eta, eta.shape = 10, eta.rate = 0.1) {
-    #   1/stats::rgamma(Q, shape=eta.shape + N/2, rate=eta.rate + colSums(eta * eta)/2)
+    #   1/stats::rgamma(Q, shape=eta.shape + N/2, rate=eta.rate + colSums(eta^2)/2)
     #}
 
   # Loadings
@@ -61,14 +61,14 @@
 
   # Uniquenesses
   #' @importFrom matrixStats "colSums2"
-    .sim_psi_uu  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat, Q0)  {
+    .sim_psi_uu  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat, Q0) {
       S.mat      <- c.data  - if(Q0) tcrossprod(eta, lmat) else 0L
-        stats::rgamma(P, shape=N/2L + psi.alpha, rate=colSums2(S.mat * S.mat)/2 + psi.beta)
+        stats::rgamma(P, shape=N/2L + psi.alpha, rate=colSums2(S.mat^2)/2 + psi.beta)
     }
 
-    .sim_psi_uc  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat, Q0)  {
+    .sim_psi_uc  <- function(N, P, psi.alpha, psi.beta, c.data, eta, lmat, Q0) {
       S.mat      <- c.data  - if(Q0) tcrossprod(eta, lmat) else 0L
-        rep(stats::rgamma(1, shape=(N * P)/2L + psi.alpha, rate=sum(S.mat * S.mat)/2 + psi.beta), P)
+        rep(stats::rgamma(1, shape=(N * P)/2L + psi.alpha, rate=sum(S.mat^2)/2 + psi.beta), P)
     }
 
   #' @importFrom matrixStats "colSums2"
@@ -82,11 +82,11 @@
 
   #' @importFrom matrixStats "colSums2"
     .sim_psi_u1  <- function(u.shape, psi.beta, S.mat, V) {
-        stats::rgamma(V, shape=u.shape, rate=colSums2(S.mat * S.mat)/2 + psi.beta)
+        stats::rgamma(V, shape=u.shape, rate=colSums2(S.mat^2)/2  + psi.beta)
     }
 
     .sim_psi_c1  <- function(u.shape, psi.beta, S.mat, V = 1L) {
-        stats::rgamma(V, shape=u.shape, rate=sum(S.mat * S.mat)/2 + psi.beta)
+        stats::rgamma(V, shape=u.shape, rate=sum(S.mat^2)/2 + psi.beta)
     }
 
   # Local Shrinkage
@@ -177,22 +177,25 @@
         vs * cumprod(1 - c(prev.prod, vs[-len]))
     }
 
-    # .sim_pi_infX <- function(nn, Kn, G, alpha, discount = 0) {
-    #  Kn1        <- Kn + 1L
-    #  pirG       <- rDirichlet(Kn1, c(nn - discount, alpha + Kn * discount))
-    #  rG         <- pirG[Kn1]
-    #  pis        <- pirG[-Kn1]
-    #  if(G > Kn)  {
-    #    Vs       <- .sim_vs_inf(alpha=alpha, discount=discount, len=G - Kn, lseq=Kn1)
-    #    pis      <- c(pis, .sim_pi_inf(vs=Vs, len=length(Vs), prev.prod=1 - rG))
-    #    rG       <- 1 - sum(pis)
-    #  }
-    #    return(list(pi.prop = pis, prev.prod = ifelse(rG < 0, pis[G] * (1/Vs[length(Vs)] - 1), rG)))
-    # }
-    #
-    # .slice_threshold  <- function(N, alpha, discount = 0, ...)  {
-    #   ((alpha + discount * G_expected(N, alpha, discount, ...)) * (1 - discount))/((alpha + N) * (alpha + 1))
-    # }
+    .sim_pi_infX <- function(nn, Kn, G, alpha, discount = 0) {
+      Kn1        <- Kn + 1L
+      pirG       <- rDirichlet(Kn1, c(nn - discount, alpha + Kn * discount))
+      rG         <- pirG[Kn1]
+      pis        <- pirG[-Kn1]
+      if(G > Kn)  {
+        GKn      <- G - Kn
+        Vs       <- .sim_vs_inf(alpha=alpha, discount=discount, len=GKn, lseq=Kn1)
+        for(g in seq_len(GKn)) {
+          pis    <- c(pis, rG  * Vs[g])
+          rG     <- rG   *  (1 - Vs[g])
+        }
+      }
+        return(list(pi.prop = pis, prev.prod = ifelse(rG < 0, pis[G] * (1/Vs[GKn] - 1), rG)))
+     }
+
+    .slice_threshold  <- function(N, alpha, discount = 0, ...)  {
+      ((alpha + discount * G_expected(N, alpha, discount, ...)) * (1 - discount))/((alpha + N) * (alpha + 1))
+     }
 
   # Cluster Labels
 #' Simulate Cluster Labels from Unnormalised Log-Probabilities using the Gumbel-Max Trick
@@ -256,39 +259,39 @@
 
   # Alpha
     .sim_alpha_g <- function(alpha, shape, rate, G, N) {
-      shape2     <- shape  + G - 1L
+      shape2     <- shape  + G  - 1L
       rate2      <- rate   - log(stats::rbeta(1, alpha + 1, N))
-      weight     <- shape2/(shape2   +  N  * rate2)
-        weight    * stats::rgamma(1L, shape=shape2 + 1, rate=rate2) + (1 - weight) * stats::rgamma(1L, shape=shape2, rate=rate2)
+      weights    <- shape2 / (shape2  + N * rate2)
+        sum(c(weights,   1 - weights) * c(stats::rgamma(2L, shape=c(shape2 + 1, shape2), rate=rate2)))
     }
 
     .log_palpha  <- function(alpha, discount, alpha.shape, alpha.rate, N, G) {
-      l.prior    <- stats::dgamma(alpha    + discount, shape=alpha.shape, rate=alpha.rate, log=TRUE)
-        lgamma(alpha  + 1) - lgamma(alpha  + N) + sum(log(alpha + discount   * seq_len(G - 1L))) + l.prior
+      l.prior    <- stats::dgamma(alpha   + discount, shape=alpha.shape, rate=alpha.rate, log=TRUE)
+        lgamma(alpha  + 1) - lgamma(alpha + N) + sum(log(alpha + discount    * seq_len(G - 1L))) + l.prior
     }
 
     .sim_alpha_m <- function(alpha, discount, alpha.shape, alpha.rate, N, G, zeta) {
-      propinter  <- c(max( - discount, alpha    - zeta), alpha  + zeta)
+      propinter  <- c(max( - discount, alpha   - zeta), alpha  + zeta)
       propa      <- stats::runif(1,    propinter[1L], propinter[2L])
-      cprob      <- .log_palpha(alpha, discount,  alpha.shape,    alpha.rate, N, G)
-      pprob      <- .log_palpha(propa, discount,  alpha.shape,    alpha.rate, N, G)
-      currinter  <- c(max( - discount, propa    - zeta), propa  + zeta)
-      logpr      <- pprob  - cprob   - log(diff(currinter))     + log(diff(propinter))
-      acpt       <- logpr >= 0  ||   - stats::rexp(1L) <= logpr
-        return(list(alpha  = ifelse(acpt, propa, alpha), rate   = acpt, l.prob = logpr))
+      cprob      <- .log_palpha(alpha, discount,  alpha.shape,   alpha.rate, N, G)
+      pprob      <- .log_palpha(propa, discount,  alpha.shape,   alpha.rate, N, G)
+      currinter  <- c(max( - discount, propa   - zeta), propa  + zeta)
+      logpr      <- pprob  - cprob    - log(diff(currinter))   + log(diff(propinter))
+      acpt       <- logpr >= 0 ||     - stats::rexp(1L) <= logpr
+        return(list(alpha  = ifelse(acpt, propa, alpha), rate  = acpt, l.prob = logpr))
     }
 
     .log_Oalpha  <- function(x, G, N, nn, shape, rate)  {
       G          <- G * x
-        lgamma(G) - lgamma(N + G)          +
-        sum(lgamma(nn + x)   - lgamma(x))  +
+        lgamma(G) - lgamma(N + G)         +
+        sum(lgamma(nn + x)   - lgamma(x)) +
         stats::dgamma(x, shape=shape, rate=rate, log=TRUE)
     }
 
     .sim_alpha_o <- function(alpha, zeta = 1, G, N, nn, shape, rate) {
-      propa      <- exp(log(alpha) + stats::rnorm(1, 0, zeta))
+      propa      <- exp(log(alpha)    + stats::rnorm(1, 0, zeta))
       logpr      <- .log_Oalpha(propa, G, N, nn, shape, rate) - .log_Oalpha(alpha, G, N, nn, shape, rate) + log(propa) - log(alpha)
-      acpt       <- logpr >= 0  || - stats::rexp(1L)   <= logpr
+      acpt       <- logpr >= 0 ||     - stats::rexp(1L) <= logpr
         return(list(alpha  = ifelse(acpt, propa, alpha), rate = acpt, l.prob = logpr))
     }
 
@@ -345,8 +348,8 @@
         matrnorm(N, Q)
     }
    # @importFrom Rfast "matrnorm"
-   #.sim_het_p   <- function(N, Q, eta.shape, eta.rate) {
-   #   .sim_eta_p(N, Q)/sqrt(.rgamma0(Q, shape=eta.shape, rate=eta.rate))
+   #.sim_het_p   <- function(N, Q, eta.sig) {
+   #   .sim_eta_p(N, Q)/sqrt(eta.sig)
    #}
 
   # Loadings
@@ -842,7 +845,7 @@
 #' Posterior Confusion Matrix
 #'
 #' For a (\code{N * G}) matrix of posterior cluster membership probabilities, this function creates a (\code{G * G}) posterior confusion matrix, whose hk-th entry gives the average probability that observations with maximum posterior allocation h will be assigned to cluster k.
-#' @param z A (\code{N * G}) matrix of posterior cluster membership probabilities whose ig-th entry gives the posterior probability that observation i belongs to cluster g. Entries must be valid probabilities in the interval [0,1]; missing values are not allowed.
+#' @param z A (\code{N * G}) matrix of posterior cluster membership probabilities whose (ig)-th entry gives the posterior probability that observation i belongs to cluster g. Entries must be valid probabilities in the interval [0,1]; missing values are not allowed.
 #'
 #' Otherwise, a list of such matrices can be supplied, where each matrix in the list has the same dimensions.
 #' @param scale A logical indicator whether the PCM should be rescaled by its row sums. When \code{TRUE} (the default), the benchmark matrix for comparison is the identity matrix of order \code{G}, corresponding to a situation with no uncertainty in the clustering. When \code{FALSE}, the row sums give the number of observations in each cluster.
@@ -922,7 +925,7 @@
 
   # Move 2
     .lab_move2   <- function(G, Vs, nn)    {
-      sw         <- sample(G, 1L, prob=c(rep(1, G - 2L), 0.5, 0.5))
+      sw         <- sample.int(G, 1L, prob=c(rep(1, G - 2L), 0.5, 0.5))
       sw         <- if(is.element(sw, c(G, G - 1L))) c(G - 1L, G) else c(sw, sw + 1L)
       nns        <- nn[sw]
       if(nns[1L] == 0)      {
@@ -1110,7 +1113,7 @@
       V          <- ifelse(P.dim, P, 1L)
       rGseq      <- seq_along(range.G)
       obj.name   <- deparse(substitute(obj0g))
-      obj.name   <- ifelse(grepl("$", obj.name, fixed=TRUE), sapply(strsplit(obj.name, "$", fixed=TRUE), "[[", 2), obj.name)
+      obj.name   <- ifelse(grepl("$", obj.name, fixed=TRUE), vapply(strsplit(obj.name, "$", fixed=TRUE), "[[", character(1L), 2L), obj.name)
       sw.name    <- deparse(substitute(switch0g))
       if(!inherits(obj0g,
                    "list"))       obj0g <- list(obj0g)
@@ -1409,7 +1412,7 @@
       } else {
         msg      <- switch(EXPR=meth, MFA=paste0(Gmsg, " and", Qmsg), MIFA=Gmsg)
       }
-      cat(paste0(meth, " simulations for '", name, "' dataset", msg, " to be passed to get_IMIFA_results(...)\n"))
+      cat(paste0(meth, " simulations for '", name, "' data set", msg, " to be passed to get_IMIFA_results(...)\n"))
         invisible()
     }
 
@@ -1443,7 +1446,7 @@
       } else {
         msg      <- switch(EXPR=meth, MFA=paste0(Gmsg, " and", Qmsg), MIFA=Gmsg)
       }
-      summ       <- list(call = call, details = paste0(meth, " simulations for '", name, "' dataset", msg, " to be passed to get_IMIFA_results(...)\n"))
+      summ       <- list(call = call, details = paste0(meth, " simulations for '", name, "' data set", msg, " to be passed to get_IMIFA_results(...)\n"))
       class(summ)        <- "summary_IMIFA"
         summ
     }
@@ -1696,13 +1699,13 @@
 #' The special case of \code{discount < 0} is allowed, in which case \code{learn.d=FALSE} is forced and \code{alpha} must be supplied as a positive integer multiple of \code{abs(discount)}. Fixing \code{discount > 0.5} is discouraged (see \code{learn.alpha}).
 #' @param learn.d Logical indicating whether the \code{discount} parameter is to be updated via Metropolis-Hastings (defaults to \code{TRUE}, unless \code{discount} is supplied as a negative value).
 #' @param d.hyper Hyperparameters for the Beta(a,b) prior on the \code{discount} parameter. Defaults to Beta(1,1), i.e. Uniform(0,1).
-#' @param ind.slice Logical indicating whether the independent slice-efficient sampler is to be employed (defaults to \code{TRUE}). If \code{FALSE} the dependent slice-efficient sampler is employed, whereby the slice sequence \eqn{\xi_1,\ldots,\xi_g}{xi_1,...,xi_g} is equal to the decreasingly ordered mixing proportions.
+#' @param ind.slice Logical indicating whether the independent slice-efficient sampler is to be employed (defaults, typically, to \code{TRUE}). If \code{FALSE} the dependent slice-efficient sampler is employed, whereby the slice sequence \eqn{\xi_1,\ldots,\xi_g}{xi_1,...,xi_g} is equal to the decreasingly ordered mixing proportions. When \code{thresh} &/or \code{exchange} are set to \code{TRUE} (see below), this argument is forced to \code{FALSE}.
 #' @param rho Parameter controlling the rate of geometric decay for the independent slice-efficient sampler, s.t. \eqn{\xi=(1-\rho)\rho^{g-1}}{xi = (1 - rho)rho^(g-1)}. Must lie in the interval [0, 1). Higher values are associated with better mixing but longer run times. Defaults to 0.75, but 0.5 is an interesting special case which guarantees that the slice sequence \eqn{\xi_1,\ldots,\xi_g}{xi_1,...,xi_g} is equal to the \emph{expectation} of the decreasingly ordered mixing proportions. Only relevant when \code{ind.slice} is \code{TRUE}.
 #' @param trunc.G The maximum number of allowable and storable clusters under the \code{"IMIFA"} and \code{"IMFA"} models. The number of active clusters to be sampled at each iteration is adaptively truncated, with \code{trunc.G} as an upper limit for storage reasons. Defaults to \code{max(min(N-1, 50), range.G))} and must satisfy \code{range.G <= trunc.G < N}. Note that large values of \code{trunc.G} may lead to memory capacity issues.
 #' @param kappa The spike-and-slab prior distribution on the \code{discount} hyperparameter is assumed to be a mixture with point-mass at zero and a continuous Beta(a,b) distribution. \code{kappa} gives the weight of the point mass at zero (the 'spike'). Must lie in the interval [0,1]. Defaults to 0.5. Only relevant when \code{isTRUE(learn.d)}. A value of 0 ensures non-zero discount values (i.e. Pitman-Yor) at all times, and \emph{vice versa}. Note that \code{kappa} will default to exactly 0 if \code{alpha<=0} and \code{learn.alpha=FALSE}.
-#' @param IM.lab.sw Logical indicating whether the two forced label switching moves are to be implemented (defaults to \code{TRUE}) when running one of the infinite mixture models.
-# #' @param thresh Logical indicating whether the threshold of Fall and Barat (2014) should be incorporated into the slice sampler. See the reference for details. This is an experimental feature (defaults to \code{FALSE}).
-# #' @param exchange Logical indicating whether the exchangeable slice sampler of Fall and Barat (2014) should be used instead. See the reference for details. This argument can work with or without \code{thresh=TRUE} above, though it is also an experimental argument and thus defaults to \code{FALSE}. \strong{Note}: this argument cannot be \code{TRUE} when \code{IM.lab.sw} is also \code{TRUE} (its default).
+#' @param IM.lab.sw Logical indicating whether the two forced label switching moves are to be implemented (defaults to \code{TRUE}) when running one of the infinite mixture models. Note: when \code{exchange=TRUE} (see below), this argument is instead forced to \code{FALSE}.
+#' @param thresh Logical indicating whether the threshold of Fall and Barat (2014) should be incorporated into the slice sampler. See the reference for details. This is an experimental feature (defaults to \code{FALSE}) and can work with or without \code{exchange} below. Setting \code{thresh=TRUE} is \strong{not} recommended unless both \code{learn.alpha} and \code{learn.d} are \code{FALSE}. Setting \code{thresh} to \code{TRUE} also forces \code{ind.slice} to \code{FALSE} (see above).
+#' @param exchange Logical indicating whether the exchangeable slice sampler of Fall and Barat (2014) should be used instead. See the reference for details. This argument can work with or without \code{thresh=TRUE} above, though it is also an experimental argument and thus defaults to \code{FALSE}. When \code{TRUE}, the arguments \code{ind.slice} and \code{IM.lab.sw} (see above) are both forced to \code{FALSE}.
 #' @param zeta
 #' \describe{
 #' \item{For the \code{"IMFA"} and \code{"IMIFA"} methods:}{Tuning parameter controlling the acceptance rate of the random-walk proposal for the Metropolis-Hastings steps when \code{learn.alpha=TRUE}, where \code{2 * zeta} gives the full width of the uniform proposal distribution. These steps are only invoked when either \code{discount} is non-zero and fixed or \code{learn.d=TRUE}, otherwise \code{alpha} is learned by Gibbs updates. Must be strictly positive (if invoked). Defaults to \code{2}.}
@@ -1733,8 +1736,8 @@
 #' @references Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
 #'
 #' Kalli, M., Griffin, J. E. and Walker, S. G. (2011) Slice sampling mixture models, \emph{Statistics and Computing}, 21(1): 93-105.
-# #'
-# #' Fall, M. D. and Barat, E. (2014) Gibbs sampling methods for Pitman-Yor mixture models, \emph{hal-00740770v2}.
+#'
+#' Fall, M. D. and Barat, E. (2014) Gibbs sampling methods for Pitman-Yor mixture models, \emph{hal-00740770v2}.
 #' @export
 #'
 #' @seealso \code{\link{mcmc_IMIFA}}, \code{\link{G_priorDensity}}, \code{\link{G_moments}}, \code{\link{mixfaControl}}, \code{\link{mgpControl}}, \code{\link{storeControl}}
@@ -1750,8 +1753,8 @@
 #'            trunc.G = NULL,
 #'            kappa = 0.5,
 #'            IM.lab.sw = TRUE,
-# #'            thresh = FALSE,
-# #'            exchange = FALSE,
+#'            thresh = FALSE,
+#'            exchange = FALSE,
 #'            zeta = NULL,
 #'            tune.zeta = list(...),
 #'            ...)
@@ -1764,10 +1767,8 @@
 #' # Alternatively specify these arguments directly
 #' # sim   <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000, learn.d=FALSE,
 #' #                     ind.slice=FALSE, alpha.hyper=c(3, 3))
-  bnpControl     <- function(learn.alpha = TRUE, alpha.hyper = c(2L, 4L), discount = 0, learn.d = TRUE, d.hyper = c(1L, 1L),
-                             ind.slice = TRUE, rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, zeta = NULL, tune.zeta = list(...), ...) {
- #bnpControl     <- function(learn.alpha = TRUE, alpha.hyper = c(2L, 4L), discount = 0, learn.d = TRUE, d.hyper = c(1L, 1L), ind.slice = TRUE,
- #                           rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, thresh = FALSE, exchange = FALSE, zeta = NULL, tune.zeta = list(...), ...) {
+  bnpControl     <- function(learn.alpha = TRUE, alpha.hyper = c(2L, 4L), discount = 0, learn.d = TRUE, d.hyper = c(1L, 1L), ind.slice = TRUE,
+                             rho = 0.75, trunc.G = NULL, kappa = 0.5, IM.lab.sw = TRUE, thresh = FALSE, exchange = FALSE, zeta = NULL, tune.zeta = list(...), ...) {
     miss.args    <- list(discount = missing(discount), IM.lab.sw = missing(IM.lab.sw), kappa = missing(kappa),
                          trunc.G = missing(trunc.G), zeta = missing(zeta), learn.d = missing(learn.d), learn.alpha = missing(learn.alpha))
     if(any(!is.logical(learn.alpha),
@@ -1787,10 +1788,10 @@
     if(length(rho)        > 1     ||
       (rho >= 1  || rho   < 0))            stop("'rho' must be a single number in the interval [0, 1)", call.=FALSE)
     if(rho  < 0.5)                         warning("Are you sure 'rho' should be less than 0.5? This could adversely affect mixing\n", call.=FALSE, immediate.=TRUE)
-   #if(any(!is.logical(thresh),
-   #       length(thresh)         != 1))   stop("'thresh' must be a single logical indicator",   call.=FALSE)
-   #if(any(!is.logical(exchange),
-   #       length(exchange)       != 1))   stop("'exchange' must be a single logical indicator", call.=FALSE)
+    if(any(!is.logical(thresh),
+           length(thresh)         != 1))   stop("'thresh' must be a single logical indicator",   call.=FALSE)
+    if(any(!is.logical(exchange),
+           length(exchange)       != 1))   stop("'exchange' must be a single logical indicator", call.=FALSE)
     if(!missing(trunc.G) &&
        (length(trunc.G)   > 1     ||
         !is.numeric(trunc.G)      ||
@@ -1822,7 +1823,8 @@
            discount      != 0))            stop(paste0("'kappa' is exactly 1 and yet", ifelse(learn.d, " 'discount' is being learned ", if(discount != 0) " the discount is fixed at a non-zero value"), ":\nthe discount should remain fixed at zero"), call.=FALSE)
     if(any(!is.logical(IM.lab.sw),
        length(IM.lab.sw) != 1))            stop("'IM.lab.sw' must be a single logical indicator", call.=FALSE)
-   #if(all(exchange, IM.lab.sw))           stop("'exchange' cannot be TRUE when 'IM.lab.sw' is also TRUE", call.=FALSE)
+    if(isTRUE(thresh)    &&
+       any(learn.alpha, learn.d))          warning("'thresh=TRUE' is NOT recommended when either 'learn.alpha' OR 'learn.d' are TRUE\n", call.=FALSE, immediate.=TRUE)
     if(!missing(zeta)    &&
        any(!is.numeric(zeta),
        length(zeta)      != 1,
@@ -1871,10 +1873,8 @@
       }
     }
     attr(tz,  "IM.Need") <- any(gibbs.def, def.py)
-   #BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper, thresh = thresh,
-   #                     exchange = exchange, rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
-    BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper,
-                         rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
+    BNP          <- list(learn.alpha = learn.alpha, a.hyper = alpha.hyper, discount = discount, learn.d = learn.d, d.hyper = d.hyper, thresh = thresh,
+                         exchange = exchange, rho = rho, ind.slice = ind.slice, trunc.G = trunc.G, kappa = kappa, IM.lab.sw = IM.lab.sw, zeta = zeta, tune.zeta = tz)
     attr(BNP, "Missing") <- miss.args
       BNP
   }
@@ -1899,7 +1899,7 @@
 #' Defaults to \code{0.1} & \code{0.00005}, respectively. Must be non-negative and strictly positive, respectively, to ensure diminishing adaptation.
 #' @param beta.d1 Rate hyperparameter of the column shrinkage on the first column of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to 1.
 #' @param beta.d2 Rate hyperparameter of the column shrinkage on the subsequent columns of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to 1.
-#' @param start.AGS The iteration at which adaptation under the AGS is to begin. Defaults to \code{burnin} for the \code{"IFA"} and \code{"MIFA"} methods, defaults to 0 for the \code{"OMIFA"} and \code{"IMIFA"} methods, and defaults to 0 for all methods if the data set is univariate or bivariate. Cannot exceed \code{burnin}.
+#' @param start.AGS The iteration at which adaptation under the AGS is to begin. Defaults to \code{burnin} for the \code{"IFA"} and \code{"MIFA"} methods, defaults to \code{2} for the \code{"OMIFA"} and \code{"IMIFA"} methods, and defaults to \code{2} for all methods if the data set is univariate or bivariate. Cannot exceed \code{burnin}; thus defaults to the same value as \code{burnin} if necessary.
 #' @param stop.AGS The iteration at which adaptation under the AGS is to stop completely. Defaults to \code{Inf}, such that the AGS is never explicitly forced to stop (thereby overriding the diminishing adaptation probability after \code{stop.AGS}). Must be greater than \code{start.AGS}. The diminishing adaptation probability prior to \code{stop.AGS} is still governed by the arguments \code{b0} and \code{b1}.
 #' @param delta0g Logical indicating whether the \code{alpha.d1} and \code{alpha.d2} hyperparameters can be cluster-specific. Defaults to \code{FALSE}. Only relevant for the \code{"MIFA"} method and only allowed when \code{z.list} is supplied within \code{\link{mcmc_IMIFA}}.
 #' @param ... Catches unused arguments.
@@ -1935,7 +1935,7 @@
 #'            b1 = 5e-05,
 #'            beta.d1 = 1,
 #'            beta.d2 = 1,
-#'            start.AGS = 0L,
+#'            start.AGS = 2L,
 #'            stop.AGS = Inf,
 #'            delta0g = FALSE,
 #'            ...)
@@ -1949,11 +1949,11 @@
 #' # sim   <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000,
 #' #                     phi.hyper=c(2.5, 1), eps=1e-02, truncated=TRUE)
     mgpControl   <- function(alpha.d1 = 2.1, alpha.d2 = 3.1, phi.hyper = c(3, 2), sigma.hyper = c(3, 2), prop = 0.7, eps = 1e-01, adapt = TRUE, forceQg = FALSE,
-                             cluster.shrink = TRUE, truncated = FALSE, b0 = 0.1, b1 = 5e-05, beta.d1 = 1, beta.d2 = 1, start.AGS = 0L, stop.AGS = Inf, delta0g = FALSE, ...) {
+                             cluster.shrink = TRUE, truncated = FALSE, b0 = 0.1, b1 = 5e-05, beta.d1 = 1, beta.d2 = 1, start.AGS = 2L, stop.AGS = Inf, delta0g = FALSE, ...) {
    #mgpControl   <- function(alpha.d1 = 2.1, alpha.d2 = 3.1, phi.hyper = c(3, 2), sigma.hyper = c(3, 2), SIGMA.hyper = c(3, 2), prop = 0.7, eps = 1e-01, adapt = TRUE, forceQg = FALSE,
-   #                         cluster.shrink = TRUE, global.shrink = FALSE, truncated = FALSE, b0 = 0.1, b1 = 5e-05, beta.d1 = 1, beta.d2 = 1, start.AGS = 0L, stop.AGS = Inf, delta0g = FALSE, ...) {
+   #                         cluster.shrink = TRUE, global.shrink = FALSE, truncated = FALSE, b0 = 0.1, b1 = 5e-05, beta.d1 = 1, beta.d2 = 1, start.AGS = 2L, stop.AGS = Inf, delta0g = FALSE, ...) {
       miss.args  <- list(propx = missing(prop), startAGSx = missing(start.AGS), stopAGSx = missing(stop.AGS))
-     #miss.args  <- list(propx = missing(prop), startAGSx = missing(start.AGS), stopAGSx = missing(stop.AGS), global.shrink = missing(global.shrink))
+     #miss.args  <- list(propx = missing(prop), startAGSx = missing(start.AGS), stopAGSx = missing(stop.AGS), global.shrinkx = missing(global.shrink))
       if(any(!is.numeric(alpha.d1),
              !is.numeric(alpha.d2),
              c(alpha.d1, alpha.d2)   < 1)) stop("All column shrinkage shape hyperparameter values must be numeric and at least 1", call.=FALSE)
@@ -2310,14 +2310,15 @@
       rand       <- 1 + (sum(tab^2)  - (sum(ni^2) + sum(nj^2))/2)/n2
       nis2       <- sum(choose(ni[ni > 1], 2))
       njs2       <- sum(choose(nj[nj > 1], 2))
-      crand      <- (sum(choose(tab[tab > 1], 2)) - (nis2 * njs2)/n2)/((nis2 + njs2)/2 - (nis2 * njs2)/n2)
+      nijn2      <- (nis2 * njs2)/n2
+      crand      <- (sum(choose(tab[tab > 1], 2)) - nijn2)/((nis2 + njs2)/2 - nijn2)
         list(diag = p0, kappa = (p0 - pc)/(1 - pc), rand = rand, crand = crand)
     }
 
     .clean_args  <- function(argstr, fn, exclude.repeats = FALSE, exclude.other = NULL, dots.ok = TRUE) {
       fnargs     <- names(formals(fn))
       if(length(argstr) > 0 && !("..." %in% fnargs && dots.ok)) {
-        badargs  <- names(argstr)[!sapply(names(argstr), "%in%", c(fnargs, ""))]
+        badargs  <- names(argstr)[!vapply(names(argstr), "%in%", logical(1L), c(fnargs, ""))]
         for(i in badargs) argstr[[i]]     <- NULL
       }
       if(exclude.repeats) {
@@ -2336,7 +2337,7 @@
       if(!is.matrix(x))                    stop("'x' must be a matrix")
       m          <- if(missing(avg)) colMeans2(x) else as.vector(avg)
       n          <- nrow(x)
-      s          <- pmax((colMeans2(x * x) - (m * m)) * (n/(n - 1)), 0L)
+      s          <- pmax((colMeans2(x^2) - m^2) * n/(n - 1), 0L)
         if(std) sqrt(s) else s
     }
 
@@ -2488,13 +2489,13 @@
       na.ind     <- !is.na(x)
       x          <- abs(x[na.ind])
       if(all(icheck   <- (floor(x) == x), na.rm=TRUE)) {
-        res[na.ind]   <- if(isTRUE(after.dot)) vector("integer", length(x)) else sapply(as.integer(x), format.info, digits=22)
+        res[na.ind]   <- if(isTRUE(after.dot)) vector("integer", length(x)) else vapply(as.integer(x), format.info, integer(1L), digits=22)
       } else      {
         ipart    <- pmax(1L, floor(x))
         ichar    <- nchar(ipart)
         remain   <- x %% ipart
-        res[na.ind]   <- (sapply(gsub("0+$", "", as.character(remain)), format.info, digits=22L)         - !icheck)   -
-                      (if(isTRUE(after.dot)) pmin(1L, replace(ichar, remain == 0, 0L)) else ifelse(ichar > 1, - ichar + !icheck, 0L))
+        res[na.ind]   <- (vapply(gsub("0+$", "", as.character(remain)), format.info, integer(1L), digits=22L) - !icheck) -
+                      (if(isTRUE(after.dot)) pmin(1L, replace(ichar, remain == 0, 0L)) else ifelse(ichar > 1, -  ichar   + !icheck, 0L))
       }
         return(res)
     }
@@ -2591,8 +2592,6 @@
         invisible(list(x = x, y = y))
     }
 
-    .power2      <- function(x) x * x
-
     .rgamma0     <- function(...) {
       tmp        <- stats::rgamma(...)
       tmp[tmp    == 0]     <- .Machine$double.eps
@@ -2606,7 +2605,7 @@
       if(!is.matrix(x))                    stop("'x' must be a matrix")
       m          <- if(missing(suma)) rowSums2(x) else suma
       n          <- ncol(x)
-      s          <- (rowSums2(x * x) - (m * m)/n)/(n - 1L)
+      s          <- (rowSums2(x^2) - m^2/n)/(n - 1L)
         if(std) sqrt(s) else s
     }
 
@@ -2617,22 +2616,22 @@
       scaling    <- if(is.logical(scale))     scale     else is.numeric(scale)
       if(center  && scaling) {
         y        <- t(x) - cmeans
-          if(isTRUE(scale)) t(y/sqrt(rowSums2(y * y)) * sqrt(nrow(x) - 1L)) else t(y/scale)
-      } else if(center)     {
+          if(isTRUE(scale)) t(y/sqrt(rowSums2(y^2)) * sqrt(nrow(x) - 1L)) else t(y/scale)
+      } else if(center)      {
           t(t(x)  - cmeans)
-      } else if(scaling)    {
+      } else if(scaling)     {
           t(t(x)/if(isTRUE(scale)) colVars(x, std=TRUE) else scale)
       } else  x
     }
 
     #' @importFrom Rfast "colVars"
-    .tune_beta0  <- function(beta0, dat, type=c("diag", "mse")) { # unused
+    .tune_beta0  <- function(dat, beta0 = 3, type = c("diag", "mse")) { # unused
       dat        <- as.matrix(dat)
       N          <- nrow(dat)
       P          <- ncol(dat)
-      inv.cov    <- (beta0 + N/2L) * chol2inv(chol(diag(beta0, P) + 0.5 * crossprod(.scale2(dat, TRUE, TRUE)))) * tcrossprod(1/colVars(dat, std=TRUE))
+      inv.cov    <- (beta0 + N/2L) * chol2inv(chol(diag(beta0, P) + 0.5 * crossprod(.scale2(dat)))) * tcrossprod(1/colVars(dat, std=TRUE))
       error      <- diag(P) - (stats::cov(dat) %*% inv.cov)
-        switch(EXPR=match.arg(type), diag=sum(diag(error)^2)/P, mean(error * error))
+        switch(EXPR=match.arg(type), diag=sum(diag(error)^2)/P, mean(error^2))
     }
 
     #' @importFrom matrixStats "colSums2" "rowSums2"
@@ -2640,7 +2639,7 @@
       p          <- ncol(x)
       if(p        < 2)                     return(x)
       if(normalize)         {
-        sc       <- sqrt(rowSums2(x * x))
+        sc       <- sqrt(rowSums2(x^2))
         x        <- x/sc
       }
       n          <- nrow(x)
@@ -2649,7 +2648,7 @@
       ns         <- rep(1L, n)
       for(i in seq_len(1000L)) {
         z        <- x    %*% TT
-        sB       <- La.svd(crossprod(x, z^3  - z %*% diag(colSums2(z * z)/n)))
+        sB       <- La.svd(crossprod(x, z^3  - z %*% diag(colSums2(z^2)/n)))
         TT       <- sB$u %*% sB$vt
         dp       <- d
         d        <- sum(sB$d)
