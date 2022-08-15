@@ -107,7 +107,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
                                 zlabels = NULL, heat.map = TRUE, show.last = FALSE, palette = NULL, ind = NULL, fac = NULL, by.fac = FALSE, type = c("h", "n", "p", "l"), intervals = TRUE, common = TRUE, partial = FALSE, titles = TRUE, transparency = 0.75, ...) {
 
   if(missing(x))                      stop("'x' must be supplied", call.=FALSE)
-  if(class(x) != "Results_IMIFA")     stop("Results object of class 'Results_IMIFA' must be supplied", call.=FALSE)
+  if(!inherits(x, "Results_IMIFA"))   stop("Results object of class 'Results_IMIFA' must be supplied", call.=FALSE)
   GQ.res  <- x$GQ.results
   G       <- GQ.res$G
   Gseq    <- seq_len(G)
@@ -157,7 +157,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   method  <- attr(x, "Method")
   store   <- attr(x, "Store")
   n.var   <- attr(x, "Vars")
-  var.pal <- max(min(n.var, 1024), 2)
+  var.pal <- max(min(n.var, 1024L), 2L)
   n.obs   <- attr(x, "Obs")
   z.sim   <- attr(x, "Z.sim")
   plot.mx <- missing(plot.meth)
@@ -186,7 +186,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
   var.names    <- attr(x, "Varnames")
   obs.names    <- if(is.null(obs.names)) seq_len(n.obs) else obs.names
   var.names    <- if(is.null(var.names)) seq_len(n.var) else var.names
-  names(v.sw)  <- formals()$param
+  v.sw         <- c(v.sw[-6L], v.sw[6L])
+  names(v.sw)  <- c(as.character(formals()$param)[-1L], "u.sw")
   ci.sw        <- v.sw
   uni.type     <- unname(attr(x, "Uni.Meth")['Uni.Type'])
   if((grp.ind  <- !is.element(method, c("FA", "IFA")) && !(param == "uniquenesses" && is.element(uni.type, c("constrained", "single"))))) {
@@ -237,6 +238,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
      !v.sw[param],
      is.element(method, c("FA", "IFA")))) {
     if(show.last)  {                  stop(paste0("Can't plot last valid sample, as ",    param, switch(EXPR=param, alpha=, discount=" wasn't", " weren't"), " stored"),   call.=FALSE)
+    } else if(param == "means" &&
+              !v.sw["u.sw"])    {     stop("Nothing to plot as means were not updated",   call.=FALSE)
     } else if(all.ind)  {             warning(paste0("Can only plot posterior mean, as ", param, switch(EXPR=param, alpha=, discount=" wasn't", " weren't"), " stored\n"), call.=FALSE)
       all.ind      <- FALSE
       m.sw["M.sw"] <- TRUE
@@ -426,10 +429,10 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
         plot.x <- x$Means$mus[[g]]
         if(matx) {
           if(mispal) grDevices::palette(viridis(var.pal, option="D", alpha=transparency))
-          graphics::matplot(t(plot.x), type="l", ylab="", xlab="Iteration", lty=1, ylim=if(is.element(method, c("FA", "IFA"))) c(-1, 1), col=seq_along(grDevices::palette()))
+          graphics::matplot(t(plot.x), type="l", ylab="", xlab="Iteration", lty=1, ylim=if(is.element(method, c("FA", "IFA")) && attr(x, "Center")) c(-1, 1), col=seq_along(grDevices::palette()))
           if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, "", paste0(":\nMeans", ifelse(grp.ind, paste0(" - Cluster ", g), ""))))))
         } else {
-          base::plot(x=iter, y=plot.x[ind,], type="l", ylab="", xlab="Iteration", ylim=if(is.element(method, c("FA", "IFA"))) c(-1, 1))
+          base::plot(x=iter, y=plot.x[ind,], type="l", ylab="", xlab="Iteration",  ylim=if(is.element(method, c("FA", "IFA")) && attr(x, "Center")) c(-1, 1))
           if(titles) graphics::title(main=list(paste0("Trace", ifelse(all.ind, ":\n", paste0(":\nMean - ", ifelse(grp.ind, paste0("Cluster ", g, " - "), ""))), var.names[ind], " Variable")))
         }
       }
@@ -719,7 +722,7 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
           cixx <- if(all(intervals, ci.sw[param])) range(ci.x[[g]])
         }
         if(ci.sw[param])  ci.x   <- ci.x[[g]]
-        base::plot(plot.x, type=type, ylab="", xlab="Variable", ylim=if(is.element(method, c("FA", "IFA"))) c(-1, 1) else if(all(intervals, ci.sw[param])) cixx else pxx, lend=1)
+        base::plot(plot.x, type=type, ylab="", xlab="Variable", ylim=if(is.element(method, c("FA", "IFA")) && attr(x, "Center")) c(-1, 1) else if(all(intervals, ci.sw[param])) cixx else pxx, lend=1)
         if(all(intervals, ci.sw[param])) suppressWarnings(.plot_CI(plot.x, li=ci.x[,1L], ui=ci.x[,2L], slty=3, scol=grey, add=TRUE, gap=TRUE, pch=ifelse(type == "n", NA, 20)))
         if(titles) graphics::title(main=list(paste0(post.last, ifelse(all.ind, "", paste0(":\nMeans", ifelse(grp.ind, paste0(" - Cluster ", g), ""))))))
         if(type  == "n") graphics::text(x=seq_along(plot.x), y=plot.x, var.names, cex=0.5)
@@ -1614,11 +1617,11 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #' Using only base graphics, this function appends a colour key legend for heatmaps produced by, for instance, \code{\link{plot_cols}} or \code{\link[graphics]{image}}.
 #' @param data Either the data with which the heatmap was created or a vector containing its minimum and maximum values. Missing values are ignored.
 #' @param cols The colour palette used when the heatmap was created. By default, the same \code{\link[viridisLite]{viridis}} default as in \code{\link{mat2cols}} is used. Will be checked for validity by \code{\link{is.cols}}.
-#' @param breaks Optional argument giving the break-points for the axis labels
+#' @param breaks Optional argument giving the break-points for the axis labels.
 #' @param cex.lab Magnification of axis annotation, indicating the amount by which plotting text and symbols should be scaled relative to the default of 1.
 #' @param ... Catches unused arguments.
 #'
-#' @return Modifies an existing plot by adding a colour-key legend.
+#' @return Modifies an existing plot by adding a colour key legend.
 #' @export
 #' @keywords plotting
 #'
@@ -1994,7 +1997,8 @@ plot.Results_IMIFA  <- function(x, plot.meth = c("all", "correlation", "density"
 #' @importFrom matrixStats "colMeans2"
 #' @export
   show_IMIFA_digit.Results_IMIFA <- function(res, G = 1L, what = c("mean", "last"), dat = NULL, ind = NULL, ...) {
-    if(class(res) != "Results_IMIFA") stop("Results object of class 'Results_IMIFA' must be supplied", call. = FALSE)
+    if(!inherits(res,
+                 "Results_IMIFA"))    stop("Results object of class 'Results_IMIFA' must be supplied", call. = FALSE)
     if(G > res$GQ.results$G)          stop("Invalid 'G'", call. = FALSE)
     if(!all(is.character(what)))      stop("'what' must be a character vector of length 1", call. = FALSE)
     sd0        <- if(missing(ind)) attr(res, "Sd0.drop") else if(is.logical(ind)) !ind else !(seq_len(attr(res, "Vars")) %in% ind)

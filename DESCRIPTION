@@ -1,9 +1,9 @@
 Package: IMIFA
 Type: Package
-Date: 2021-12-19
+Date: 2022-08-12
 Title: Infinite Mixtures of Infinite Factor Analysers and Related
         Models
-Version: 2.1.8
+Version: 2.1.9
 Authors@R: c(person("Keefe", "Murphy", email = "keefe.murphy@mu.ie", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-7709-3159")),
              person("Cinzia", "Viroli", email = "cinzia.viroli@unibo.it", role = "ctb", comment = c(ORCID = "0000-0002-3278-5266")),
              person("Isobel Claire", "Gormley", email = "claire.gormley@ucd.ie", role = "ctb", comment = c(ORCID = "0000-0001-7713-681X")))
@@ -17,17 +17,17 @@ LazyData: true
 Imports: matrixStats (>= 0.53.1), mclust (>= 5.4), mvnfast, Rfast (>=
         1.9.8), slam, viridisLite
 Suggests: gmp (>= 0.5-4), knitr, mcclust, rmarkdown, Rmpfr
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.1
 VignetteBuilder: knitr
 Collate: 'MainFunction.R' 'Diagnostics.R' 'FullConditionals.R'
         'Gibbs_FA.R' 'Gibbs_IFA.R' 'Gibbs_IMFA.R' 'Gibbs_IMIFA.R'
         'Gibbs_MFA.R' 'Gibbs_MIFA.R' 'Gibbs_OMFA.R' 'Gibbs_OMIFA.R'
         'IMIFA.R' 'PlottingFunctions.R' 'SimulateData.R' 'data.R'
 NeedsCompilation: no
-Packaged: 2021-12-19 10:55:21 UTC; Keefe
+Packaged: 2022-08-12 14:54:58 UTC; Keefe
 Author: Keefe Murphy [aut, cre] (<https://orcid.org/0000-0002-7709-3159>),
   Cinzia Viroli [ctb] (<https://orcid.org/0000-0002-3278-5266>),
   Isobel Claire Gormley [ctb] (<https://orcid.org/0000-0001-7713-681X>)
 Maintainer: Keefe Murphy <keefe.murphy@mu.ie>
 Repository: CRAN
-Date/Publication: 2021-12-19 14:32:13 UTC
+Date/Publication: 2022-08-15 07:10:22 UTC
