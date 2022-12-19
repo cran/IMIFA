@@ -39,11 +39,11 @@
       pi.store       <- matrix(0L, nrow=G, ncol=n.store)
     }
     z.store          <- matrix(0L, nrow=n.store, ncol=N)
-    ll.store         <- vector("integer", n.store)
+    ll.store         <-
+    G.store          <- integer(n.store)
     Q.store          <- matrix(0L, nrow=G, ncol=n.store)
     Q.large          <- Q.big <- Q.bigs <- FALSE
     err.z            <- z.err <- FALSE
-    G.store          <- vector("integer", n.store)
     nu1.5            <- nu1 + 0.5
     P.5              <- P/2
 
@@ -65,7 +65,7 @@
       alpha.store    <- ll.store
       alpha.shape    <- a.hyper[1L]
       alpha.rate     <- a.hyper[2L]
-      a.rates        <- vector("integer", total)
+      a.rates        <- integer(total)
     } else a.rates   <- 1L
     avgzeta          <- zeta
     heat             <- tune.zeta$heat
@@ -83,7 +83,7 @@
       V              <- switch(EXPR=uni.type,  constrained=P, single=1L)
     }
     psi.beta         <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
-    pi.prop          <- c(cluster$pi.prop, vector("numeric", G - length(cluster$pi.prop)))
+    pi.prop          <- c(cluster$pi.prop, numeric(G - length(cluster$pi.prop)))
     mu               <- cbind(mu, vapply(seq_len(G - length(cluster$pi.prop)), function(g) .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P)))
     Qmax             <- ifelse(forceQg, max(Qs), Q)
     Qmaxseq          <- seq_len(Qmax)
@@ -130,7 +130,7 @@
       # Adaptation
       if(adapt       && all(iter >= start.AGS, iter < stop.AGS))  {
         if(stats::runif(1) < ifelse(iter < AGS.burn, 0.5, exp(-b0 - b1 * (iter - start.AGS))))    {
-          colvec     <- lapply(nn.ind, function(g) (if(Q0[g]) colSums(abs(lmat[[g]])    < epsilon)/P else stats::runif(1)) >= prop)
+          colvec     <- lapply(nn.ind, function(g) if(Q0[g]) (colSums2(abs(lmat[[g]])   < epsilon)/P) >= prop else stats::runif(1) <= prop)
           nonred     <- lapply(colvec, .which0)
           numred     <- lengths(colvec)  - lengths(nonred)
           notred     <- numred == 0

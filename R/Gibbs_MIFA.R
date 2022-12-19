@@ -39,7 +39,7 @@
       pi.store     <- matrix(0L, nrow=G, ncol=n.store)
     }
     z.store        <- matrix(0L, nrow=n.store, ncol=N)
-    ll.store       <- vector("integer", n.store)
+    ll.store       <- integer(n.store)
     Q.store        <- matrix(0L, nrow=G, ncol=n.store)
     Q.large        <- Q.big <- Q.bigs <- FALSE
     err.z          <- z.err <- FALSE
@@ -137,7 +137,7 @@
       # Adaptation
       if(adapt     && all(iter >= start.AGS, iter < stop.AGS))    {
         if(stats::runif(1) < ifelse(iter < AGS.burn, 0.5, exp(-b0 - b1 * (iter - start.AGS))))  {
-          colvec   <- lapply(nn.ind, function(g) (if(Q0[g]) colSums(abs(lmat[[g]])    < epsilon)/P else stats::runif(1)) >= prop)
+          colvec   <- lapply(nn.ind, function(g) if(Q0[g]) (colSums2(abs(lmat[[g]])   < epsilon)/P) >= prop else stats::runif(1) <= prop)
           nonred   <- lapply(colvec, .which0)
           numred   <- lengths(colvec) - lengths(nonred)
           notred   <- numred == 0

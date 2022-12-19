@@ -6,8 +6,8 @@
 #' \itemize{
 #' \item{Type: }{Package}
 #' \item{Package: }{IMIFA}
-#' \item{Version: }{2.1.9}
-#' \item{Date: }{2022-08-12 (this version), 2017-02-02 (original release)}
+#' \item{Version: }{2.1.10}
+#' \item{Date: }{2022-12-19 (this version), 2017-02-02 (original release)}
 #' \item{Licence: }{GPL (>=2)}
 #' }
 #'
@@ -44,7 +44,7 @@
   version <- read.dcf(path, "Version")
   name    <- read.dcf(path, "Package")
   if(interactive()) {
-    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\\t   Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\\t     and Related Models\n/____/_/   /_/_____/_/  /_/     \\_\\\t\t  version", version, "\n"))
+    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\\t   Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\\t     and Related Models\n/____/_/   /_/_____/_/  /_/     \\_\\\t\t version", version, "\n"))
   } else   {
     packageStartupMessage("\nPackage ", sQuote(name), " version ", version, ".\n")
   }

@@ -44,12 +44,12 @@
       pi.store       <- matrix(0L, nrow=trunc.G, ncol=n.store)
     }
     z.store          <- matrix(0L, nrow=n.store, ncol=N)
-    ll.store         <- vector("integer", n.store)
+    ll.store         <-
+    G.store          <- integer(n.store)
     Q.store          <- matrix(0L, nrow=trunc.G, ncol=n.store)
     Q.large          <- Q.big <- Q.bigs <- FALSE
     acc1             <- acc2  <- FALSE
     err.z            <- z.err <- FALSE
-    G.store          <- vector("integer", n.store)
     act.store        <- G.store
     pi.alpha         <- cluster$pi.alpha
     nu1.5            <- nu1 + 0.5
@@ -63,14 +63,14 @@
       d.store        <- ll.store
       d.shape1       <- d.hyper[1L]
       d.shape2       <- d.hyper[2L]
-      d.rates        <- vector("integer", total)
+      d.rates        <- integer(total)
       d.unif         <- d.shape1 == 1   && d.shape2 == 1
       .sim_disc_mh   <- if(!learn.alpha && pi.alpha == 0) .sim_d_slab else .sim_d_spike
     } else d.rates   <- 1L
     Dneg             <- !learn.d        && discount  < 0
     MH.step          <- any(discount  > 0, learn.d) && learn.alpha
     if(MH.step)     {
-      a.rates        <- vector("integer", total)
+      a.rates        <- integer(total)
     } else a.rates   <- 1L
     if(IM.lab.sw)   {
       lab.rate       <- matrix(0L, nrow=2L, ncol=total)
@@ -135,7 +135,7 @@
       MGPsig         <- .sim_sigma_p(G=trunc.G, rho1=rho1, rho2=rho2)
     } else MGPsig    <- rep(1L, trunc.G)
    #if(global.shrink)   {
-   #  glo.store      <- rep(0L, n.store)
+   #  glo.store      <- integer(n.store)
    #  glo.sig        <- .sim_sigma_p(G=1L, rho1=omega1, rho2=omega2)
    #} else glo.sig   <- 1L
     lmat             <- lapply(Ts, function(t) matrix(vapply(Ps, function(j) .sim_load_ps(Q=Qs[t], phi=phi[[t]][j,], tau=tau[[t]], sigma=MGPsig[t]), numeric(Qs[t])), nrow=P, byrow=TRUE))
@@ -177,7 +177,7 @@
       # Adaptation
       if(adapt       && all(iter >= start.AGS, iter < stop.AGS))  {
         if(stats::runif(1) < ifelse(iter < AGS.burn, 0.5, exp(-b0 - b1 * (iter - start.AGS))))    {
-          colvec     <- lapply(nn.ind, function(g) (if(Q0[g]) colSums(abs(lmat[[g]])    < epsilon)/P else stats::runif(1)) >= prop)
+          colvec     <- lapply(nn.ind, function(g) if(Q0[g]) (colSums2(abs(lmat[[g]])   < epsilon)/P) >= prop else stats::runif(1) <= prop)
           nonred     <- lapply(colvec, .which0)
           numred     <- lengths(colvec)  - lengths(nonred)
           notred     <- numred == 0
@@ -247,7 +247,7 @@
       }
       GI             <- which(Gs[index] == G)
       pi.prop        <- pi.prop[index]
-      Vs             <- if(!exchange) Vs[index] else rep(0L, G)
+      Vs             <- if(!exchange) Vs[index] else integer(G)
       mu[,Gs]        <- mu[,index, drop=FALSE]
       phi[Gs]        <- phi[index]
       delta[Gs]      <- delta[index]

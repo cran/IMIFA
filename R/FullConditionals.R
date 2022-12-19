@@ -555,7 +555,7 @@
 #' @param phi.shape,phi.rate The shape and rate hyperparameters for the gamma prior on the local shrinkage parameters. Not necessary for checking if the cumulative shrinkage property holds, but worth supplying \emph{both} if the actual \emph{a priori} expected shrinkage factors are of interest. The default value(s) depends on the value of \code{inverse}, but are chosen in such a way that the local shrinkage has no effect on the expectation unless both are supplied. Cannot be incorporated into the expectation if \code{phi.shape < 1} and \code{isTRUE(inverse)}.
 #' @param sigma.shape,sigma.rate The shape and rate hyperparameters for the gamma prior on the cluster shrinkage parameters. Not necessary for checking if the cumulative shrinkage property holds, but worth supplying \emph{both} if the actual \emph{a priori} expected shrinkage factors are of interest. The default value(s) depends on the value of \code{inverse}, but are chosen in such a way that the cluster shrinkage has no effect on the expectation unless both are supplied. Cannot be incorporated into the expectation if \code{sigma.shape < 1} and \code{isTRUE(inverse)}.
 #' @param bd1,bd2 Rate hyperparameters for \eqn{\delta_1}{delta_1} and \eqn{\delta_k \forall k\ge 2}{delta_k for all k >= 2}, respectively. Both default to \code{1}.
-#' @param truncated A logical value indicating whether the version of the MGP prior based on left-truncated gamma distributions is invoked (see \code{\link{ltrgamma}} and the Zhang et al. reference below). Defaults to \code{FALSE}. Note that, when \code{TRUE}, only the shrinkage parameters for the first loadings column are affected and the conditions needed to pass this check are much less strict. Moreover, more desirable shrinkage properties are easily obtained.
+#' @param truncated A logical value indicating whether the version of the MGP prior based on left-truncated gamma distributions is invoked (see \code{\link{ltrgamma}} and the Zhang et al. reference below). Defaults to \code{FALSE}. Note that, when \code{TRUE}, the expected shrinkage factors for the first loadings column are not affected and the conditions needed to pass this check for the parameters associated with subsequent columns are much less strict. Moreover, more desirable shrinkage properties are easily obtained.
 #' @param inverse Logical indicator for whether the cumulative shrinkage property is assessed against the induced Inverse Gamma prior, the default, or in terms of the Gamma prior (which is incorrect). This is always \code{TRUE} when used inside \code{\link{mcmc_IMIFA}}: the \code{FALSE} option exists only for demonstration purposes.
 #'
 #' @details This is called inside \code{\link{mcmc_IMIFA}} for the \code{"IFA"}, \code{"MIFA"}, \code{"OMIFA"} and \code{"IMIFA"} methods. This function is vectorised with respect to the arguments \code{ad1}, \code{ad2}, \code{phi.shape}, \code{phi.rate}, \code{sigma.shape}, \code{sigma.rate}, \code{bd1} and \code{bd2}.
@@ -601,7 +601,7 @@
 #' (shrink <- MGP_check(ad1=1.5, ad2=2.8, Q=10, phi.shape=2, phi.rate=0.5, inverse=TRUE))
 #'
 #' # Check previously invalid parameterisation again using truncated version of the MGP prior
-#' MGP_check(ad1=1.5, ad2=1.8, Q=10, phi.shape=3, truncated=FALSE)$valid # TRUE
+#' MGP_check(ad1=1.5, ad2=1.8, Q=10, phi.shape=3, truncated=TRUE)$valid  #TRUE
     MGP_check    <- function(ad1, ad2, Q = 3L, phi.shape = NULL, phi.rate = NULL, sigma.shape = NULL, sigma.rate = NULL, bd1 = 1, bd2 = 1, truncated = FALSE, inverse = TRUE) {
    #MGP_check    <- function(ad1, ad2, Q = 3L, phi.shape = NULL, phi.rate = NULL, sigma.shape = NULL, sigma.rate = NULL,
    #                         SIGMA.shape = NULL, SIGMA.rate = NULL, bd1 = 1, bd2 = 1, truncated = FALSE, inverse = TRUE) {
@@ -654,7 +654,7 @@
       if(any(c(ad1, ad2)  < 1))            stop("All column shrinkage shape hyperparameter values must be at least 1",             call.=FALSE)
       if(any(c(bd1, bd2) <= 0))            stop("All column shrinkage rate hyperparameter values must be strictly positive",       call.=FALSE)
       if(any(WX  <- ad1  >= ad2 &
-             !truncated))                  warning("'ad2' should be moderately large relative to 'ad1' to encourage loadings column removal\n", call.=FALSE, immediate.=TRUE)
+             isFALSE(truncated)))          warning("'ad2' should be moderately large relative to 'ad1' to encourage loadings column removal\n", call.=FALSE, immediate.=TRUE)
 
       Qseq       <- seq_len(Q)  - 1L
       ML         <- seq_len(max.len)
@@ -994,7 +994,7 @@
       check      <- all(if(isTRUE(semi)) test >= 0 else test > 0)
       if(isTRUE(make))  {
         evec     <- eigs$vectors
-        return(list(check = check, X.new = if(check) x else x + evec %*% tcrossprod(diag(pmax.int(2L * tol - eval, ifelse(isTRUE(semi), 0L, .Machine$double.eps)), d), evec)))
+        return(list(check = check, X.new = if(check) x else x + tcrossprod(evec * rep(pmax.int(2L * tol - eval, ifelse(isTRUE(semi), 0L, .Machine$double.eps)), each=NROW(evec)), evec)))
       } else check
     }
 
@@ -1058,6 +1058,7 @@
 #' \item{d}{The scaling factor (is \code{isTRUE(dilate)}).}
 #' \item{ss}{The sum of squared differences (if \code{isTRUE(sumsq)}).}
 #' @keywords utility
+#' @importFrom matrixStats "colMeans2"
 #' @export
 #'
 #' @references Borg, I. and Groenen, P. J. F. (1997) \emph{Modern Multidimensional Scaling}. Springer-Verlag, New York, NY, USA, pp. 340-342.
@@ -1097,16 +1098,17 @@
       }
       if(P2 == 0)                          stop("Xstar must contain at least one column",         call.=FALSE)
       if(anyNA(Xstar)   || anyNA(X))       stop("X and Xstar are not allowed to contain missing values", call.=FALSE)
-      J          <- if(translate) diag(N) - 1/N                                      else diag(N)
-      C          <- if(translate) crossprod(Xstar, J) %*% X                          else crossprod(Xstar, X)
+      J          <- if(translate) diag(N) - 1/N                          else diag(N)
+      C          <- if(translate) crossprod(Xstar, J) %*% X              else crossprod(Xstar, X)
       if(!all(P  == 1,
               P2 == 1))  {
         svdX     <- svd(C)
         R        <- tcrossprod(svdX$v, svdX$u)
       } else R   <- 1L
-      d          <- if(dilate)    sum(C * R)/sum(crossprod(J, X) * X)                else 1L
-      tt         <- if(translate) crossprod(Xstar - d * X %*% R, matrix(1L, N, 1))/N else 0L
-      X.new      <- d * X %*% R + if(translate) matrix(tt, N, P2, byrow = TRUE)      else tt
+      d          <- if(dilate)    sum(C * R)/sum(J * tcrossprod(X))      else 1L
+      dXR        <- d * X %*% R
+      tt         <- if(translate) colMeans2(Xstar  - dXR)                else 0L
+      X.new      <- dXR  + if(translate) matrix(tt, N, P2, byrow = TRUE) else tt
         return(c(list(X.new = X.new), list(R = R), if(translate) list(t = tt),
                  if(dilate) list(d = d), if(sumsq) list(ss = sum((X[,seq_len(P2), drop=FALSE] - X.new)^2L))))
     }
@@ -1716,13 +1718,13 @@
 #' }
 #' @param tune.zeta A list with the following named arguments, used for tuning \code{zeta} (which is either the width of the uniform proposal for the \code{"IMFA"} or \code{"IMIFA"} methods or the standard deviation of the log-normal proposal for the \code{"OMFA"} or \code{"OMIFA"} methods) for \code{alpha}, via diminishing Robbins-Monro type adaptation, when the \code{alpha} parameter is learned via Metropolis-Hastings steps:
 #' \describe{
-#' \item{\code{heat}}{The initial adaptation intensity/step-size, such that larger values lead to larger updates. Must be strictly greater than zero. Defaults to 1 if not supplied but other elements of \code{tune.zeta} are.}
+#' \item{\code{heat}}{The initial adaptation intensity/step-size, such that larger values lead to larger updates. Must be strictly greater than zero. Defaults to \code{1} if not supplied but other elements of \code{tune.zeta} are.}
 #' \item{\code{lambda}}{Iteration rescaling parameter which controls the speed at which adaptation diminishes, such that lower values cause the contribution of later iterations to diminish more slowly. Must lie in the interval (0.5, 1]. Defaults to 1 if not supplied but other elements of \code{tune.zeta} are.}
-#' \item{\code{target}}{The target acceptance rate. Must lie in the interval [0, 1]. Defaults to 0.441, which is optimum for univariate targets, if not supplied but other elements of \code{tune.zeta} are.}
+#' \item{\code{target}}{The target acceptance rate. Must lie in the interval [0, 1]. Defaults to \code{0.441}, which is optimal for univariate targets, if not supplied but other elements of \code{tune.zeta} are.}
 #' \item{\code{start.zeta}}{The iteration at which diminishing adaptation begins. Defaults to \code{100}.}
 #' \item{\code{stop.zeta}}{The iteration at which diminishing adaptation is to stop completely. Defaults to \code{Inf}, such that diminishing adaptation is never explicitly made to stop. Must be greater than \code{start.zeta}.}
 #' }
-#' At least one \code{tune.zeta} argument must be supplied for diminishing adaptation to be invoked. \code{tune.zeta} arguments are only relevant when \code{learn.alpha} is \code{TRUE} (and, for the \code{"IMFA"} and \code{"IMIFA"} methods, when either of the following is also true: the \code{discount} remains fixed at a non-zero value, or when \code{learn.d} is \code{TRUE} and \code{kappa < 1}). Since Gibbs steps are invoked for updating \code{alpha} when \code{discount == 0} under the \code{"IMFA"} or \code{"IMIFA"} methods, adaption occurs according to a running count of the number of iterations with non-zero sampled \code{discount} values for those methods.
+#' At least one \code{tune.zeta} argument must be supplied for diminishing adaptation to be invoked. \code{tune.zeta} arguments are only relevant when \code{learn.alpha} is \code{TRUE} (and, for the \code{"IMFA"} and \code{"IMIFA"} methods, when either of the following is also true: the \code{discount} remains fixed at a non-zero value, or when \code{learn.d} is \code{TRUE} and \code{kappa < 1}). Since Gibbs steps are invoked for updating \code{alpha} when \code{discount == 0} under the \code{"IMFA"} or \code{"IMIFA"} methods, adaption occurs according to a running count of the number of iterations with non-zero sampled \code{discount} values for those methods. As such, when a mix of Gibbs and MH updates are used, this tuning only targets the \code{target} acceptance rates for the MH steps; i.e. acceptances under the Gibbs framework will inflate the acceptance rate further.
 #'
 #' If diminishing adaptation is invoked, the posterior mean \code{zeta} will be stored. Since caution is advised when employing adaptation, note that acceptance rates of between 10-50\% are generally considered adequate.
 #' @param ... Catches unused arguments.
@@ -1894,7 +1896,7 @@
 #' @param adapt A logical value indicating whether adaptation of the number of cluster-specific factors is to take place when the MGP prior is employed. Defaults to \code{TRUE}. Specifying \code{FALSE} and supplying \code{range.Q} within \code{\link{mcmc_IMIFA}} provides a means to either approximate the infinite factor model with a fixed high truncation level, or to use the MGP prior in a finite factor context, however this is NOT recommended for the \code{"OMIFA"} and \code{"IMIFA"} methods.
 #' @param forceQg A logical indicating whether the upper limit on the number of cluster-specific factors \code{Q} is also cluster-specific. Defaults to \code{FALSE}: when \code{TRUE}, the number of factors in each cluster is kept below the number of observations in each cluster, in addition to the bound defined by \code{range.Q}. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods, and only invoked when \code{adapt} is \code{TRUE}. May be useful for low-dimensional data sets for which identifiable solutions are desired.
 #' @param cluster.shrink A logical value indicating whether to place the prior specified by \code{sigma.hyper} on the cluster shrinkage parameters. Defaults to \code{TRUE}. Specifying \code{FALSE} is equivalent to fixing all cluster shrinkage parameters to 1. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods. If invoked, the posterior mean cluster shrinkage factors will be reported.
-#' @param truncated A logical value indicating whether the version of the MGP prior based on left-truncated gamma distributions is invoked (see Zhang et al. reference below and additional relevant documentation in \code{\link{ltrgamma}} and \code{\link{MGP_check}}). Defaults to \code{FALSE}. Note that, when \code{TRUE}, only the shrinkage parameters for the first loadings column are affected and the conditions needed to pass \code{\link{MGP_check}} are much less strict. Moreover, more desirable shrinkage properties are easily obtained, at the expense of slightly longer run times.
+#' @param truncated A logical value indicating whether the version of the MGP prior based on left-truncated gamma distributions is invoked (see Zhang et al. reference below and additional relevant documentation in \code{\link{ltrgamma}} and \code{\link{MGP_check}}). Defaults to \code{FALSE}. Note that, when \code{TRUE}, the expected shrinkage factors for the first loadings column are not affected and the conditions needed to pass \code{\link{MGP_check}} for the parameters associated with subsequent columns are much less strict. Moreover, more desirable shrinkage properties are easily obtained, at the expense of slightly longer run times.
 #' @param b0,b1 Intercept & slope parameters for the exponentially decaying adaptation probability:
 #'
 #' \code{p(iter) = 1/exp(b0 + b1 * (iter - start.AGS))}.
@@ -2188,7 +2190,7 @@
 #' \deqn{f(x|\alpha, \beta) = \frac{\beta^\alpha}{(\Gamma(\alpha)-\Gamma(\alpha, \tau\beta))}x^{\alpha-1}e^{-x\beta}}
 #' for \eqn{0\le\tau\le x}, and \eqn{\min(\tau,\beta) > 0}{min(tau, beta) > 0}, where \eqn{\alpha}{alpha} and \eqn{\beta}{beta} are the \code{shape} and \code{rate} parameters, respectively, \eqn{\tau}{tau} is the cutoff point at which \code{trunc}ation occurs, and \eqn{\Gamma(\alpha, \tau\beta)} is the upper incomplete gamma function.
 #'
-#' @note \code{rltrgamma} is invoked internally for the \code{"IFA"}, \code{"MIFA"}, \code{"OMIFA"}, and \code{"IMIFA"} models to draw column shrinkage parameters for all but the first loadings column under the MGP prior when \code{truncated=TRUE} (which is \strong{not} the default) is supplied to \code{mgpControl}, at the expense of slightly longer run times. \code{exp_ltrgamma} is used within \code{MGP_check} to check the validity of the MGP hyperparameters when \code{truncated=TRUE} (which is again, \strong{not} the default). Both functions always assume \code{trunc=1} for these internal usages.
+#' @note \code{rltrgamma} is invoked internally for the \code{"IFA"}, \code{"MIFA"}, \code{"OMIFA"}, and \code{"IMIFA"} models to draw column shrinkage parameters for all but the first loadings column under the MGP prior when \code{truncated=TRUE} (which is \strong{not} the default) is supplied to \code{\link{mgpControl}}, at the expense of slightly longer run times. \code{exp_ltrgamma} is used within \code{\link{MGP_check}} to check the validity of the MGP hyperparameters when \code{truncated=TRUE} (which is again, \strong{not} the default). Both functions always assume \code{trunc=1} for these internal usages.
 #'
 #' Note also that no arguments are recycled, i.e. all arguments must be of length \code{1}.
 #' @return For \code{rltrgamma}, a vector of length \code{n} giving draws from the left-truncated gamma distribution with the specified \code{shape} and \code{rate} parameters, and truncation point \code{trunc}.
@@ -2295,7 +2297,7 @@
       eigs       <- eigen(x, symmetric = TRUE)
       eval       <- eigs$values
       evec       <- eigs$vectors
-        return(chol(x + evec %*% tcrossprod(diag(pmax.int(.Machine$double.eps, 2 * max(abs(eval)) * d * .Machine$double.eps - eval), d), evec), ...))
+        return(chol(x + tcrossprod(evec * rep(pmax.int(.Machine$double.eps, 2 * eval[1L] * d * .Machine$double.eps - eval), each=NROW(evec)), evec), ...))
       }
     )
 
@@ -2496,7 +2498,7 @@
       na.ind     <- !is.na(x)
       x          <- abs(x[na.ind])
       if(all(icheck   <- (floor(x) == x), na.rm=TRUE)) {
-        res[na.ind]   <- if(isTRUE(after.dot)) vector("integer", length(x)) else vapply(as.integer(x), format.info, integer(1L), digits=22)
+        res[na.ind]   <- if(isTRUE(after.dot)) integer(length(x)) else vapply(as.integer(x), format.info, integer(1L), digits=22)
       } else      {
         ipart    <- pmax(1L, floor(x))
         ichar    <- nchar(ipart)
@@ -2617,10 +2619,11 @@
     }
 
     #' @importFrom matrixStats "colMeans2" "rowSums2"
+    #' @importFrom Rfast "colVars"
     .scale2      <- function(x, center = TRUE, scale = TRUE) { # replaces Rfast::standardise
-      cmeans     <- if(isTRUE(center)) colMeans2(x)     else center
-      center     <- if(is.logical(center))   center     else is.numeric(center)
-      scaling    <- if(is.logical(scale))     scale     else is.numeric(scale)
+      cmeans     <- if(isTRUE(center))     colMeans2(x) else center
+      center     <- if(is.logical(center))       center else is.numeric(center)
+      scaling    <- if(is.logical(scale))         scale else is.numeric(scale)
       if(center  && scaling) {
         y        <- t(x) - cmeans
           if(isTRUE(scale)) t(y/sqrt(rowSums2(y^2)) * sqrt(nrow(x) - 1L)) else t(y/scale)
@@ -2636,7 +2639,7 @@
       dat        <- as.matrix(dat)
       N          <- nrow(dat)
       P          <- ncol(dat)
-      inv.cov    <- (beta0 + N/2L) * chol2inv(chol(diag(beta0, P) + 0.5 * crossprod(.scale2(dat)))) * tcrossprod(1/colVars(dat, std=TRUE))
+      inv.cov    <- (beta0 + N/2L) * chol2inv(chol(diag(beta0, P) + 0.5 * crossprod(.scale2(dat))))/tcrossprod(colVars(dat, std=TRUE))
       error      <- diag(P) - (stats::cov(dat) %*% inv.cov)
         switch(EXPR=match.arg(type), diag=sum(diag(error)^2)/P, mean(error^2))
     }
