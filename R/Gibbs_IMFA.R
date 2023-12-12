@@ -4,7 +4,7 @@
 
 # Gibbs Sampler Function
   .gibbs_IMFA        <- function(Q, data, iters, N, P, G, mu.zero, rho, sigma.l, learn.alpha, discount, mu, tune.zeta,
-                                 a.hyper, sigma.mu, burnin, thinning, d.hyper, learn.d, uni.type, uni.prior, trunc.G,
+                                 a.hyper, sigma.mu, burnin, thinning, d.hyper, learn.d, uni.type, uni.prior, trunc.G, col.mean,
                                  ind.slice, psi.alpha, psi.beta, verbose, sw, cluster, IM.lab.sw, zeta, kappa, thresh, exchange, ...) {
 
   # Define & initialise variables
@@ -101,13 +101,19 @@
     mu.tmp           <- vapply(seq_len(trunc.G - G), function(g) .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
     mu               <- cbind(mu, if(uni) t(mu.tmp) else mu.tmp)
     eta              <- .sim_eta_p(N=N, Q=Q)
-    lmat             <- if(Q0) array(vapply(Ts, function(t) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, trunc.G)) else array(0, dim=c(P, 0, trunc.G))
+    if(Q0)            {
+      eta            <- .sim_eta_p(N=N, Q=Q)
+      lmat           <- array(vapply(Ts, function(t) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, trunc.G))
+    } else            {
+      eta            <- .empty_mat(nr=N)
+      lmat           <- array(0L, dim=c(P, 0, trunc.G))
+    }
     if(isTRUE(one.uni)) {
       psi.inv        <- matrix(.sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), nrow=P, ncol=trunc.G)
     } else psi.inv   <- replicate(trunc.G, .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), simplify="array")
     psi.inv          <- if(uni) t(psi.inv) else psi.inv
     if(isTRUE(one.uni)) {
-      psi.inv[]      <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
+      psi.inv[]      <- 1/switch(EXPR=uni.type, constrained=colVars(data, center=col.mean, refine=FALSE, useNames=FALSE), max(colVars(data, center=col.mean, refine=FALSE, useNames=FALSE)))
     } else   {
       tmp.psi        <- (nn[nn0] - 1L)/pmax(rowsum(data^2, z) - rowsum(data, z)^2/nn[nn0], 0L)
       tmp.psi        <- switch(EXPR=uni.type, unconstrained=t(tmp.psi), matrix(Rfast::rowMaxs(tmp.psi, value=TRUE), nrow=P, ncol=G, byrow=TRUE))
@@ -183,9 +189,9 @@
       }
 
     # Means
-      sum.data       <- vapply(dat.g, colSums2, numeric(P))
+      sum.data       <- vapply(dat.g, colSums2, useNames=FALSE, numeric(P))
       sum.data       <- if(uni) t(sum.data) else sum.data
-      sum.eta        <- lapply(eta.tmp, colSums2)
+      sum.eta        <- lapply(eta.tmp, colSums2, useNames=FALSE)
       mu[,Gs]        <- vapply(Gs, function(g) if(nn0[g]) .sim_mu(mu.sigma=mu.sigma, psi.inv=psi.inv[,g], mu.prior=mu.prior, sum.data=sum.data[,g], sum.eta=sum.eta[[g]],
                                lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
 
@@ -343,7 +349,7 @@
           }
         } else  acc2 <- FALSE
       }
-      if(zerr && !err.z) {                                       cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE)
+      if(zerr && !err.z) {                                       cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE, immediate.=TRUE)
         err.z        <- TRUE
       }
       if(MH.step)       a.rates[iter]                         <- a.rate
@@ -360,7 +366,7 @@
         if(learn.alpha)                 alpha.store[new.it]   <- pi.alpha
         if(learn.d)                         d.store[new.it]   <- discount
                                            z.store[new.it,]   <- as.integer(z)
-                                           ll.store[new.it]   <- if(G > 1) sum(rowLogSumExps(log.probs)) else sum(dmvn(X=data, mu=mu[,nn.ind], sigma=tcrossprod(as.matrix(lmat[,,nn.ind])) + diag(psi.store[,nn.ind,new.it]), log=TRUE))
+                                           ll.store[new.it]   <- if(G > 1) sum(rowLogSumExps(log.probs, useNames=FALSE)) else sum(dmvn(X=data, mu=mu[,nn.ind], sigma=tcrossprod(as.matrix(lmat[,,nn.ind])) + diag(psi.store[,nn.ind,new.it]), log=TRUE))
                                             G.store[new.it]   <- as.integer(G.non)
                                           act.store[new.it]   <- as.integer(G)
       }
@@ -380,7 +386,7 @@
                              discount  = if(learn.d) {           if(sum(d.store == 0)/n.store > 0.5) as.simple_triplet_matrix(d.store) else d.store },
                              a.rate    = ifelse(MH.step,         mean(a.rates), a.rates),
                              d.rate    = ifelse(learn.d,         mean(d.rates), d.rates),
-                             lab.rate  = if(IM.lab.sw)           stats::setNames(rowMeans2(lab.rate), c("Move1", "Move2")),
+                             lab.rate  = if(IM.lab.sw)           stats::setNames(rowMeans2(lab.rate, useNames=FALSE), c("Move1", "Move2")),
                              z.store   = z.store,
                              ll.store  = ll.store,
                              G.store   = G.store,

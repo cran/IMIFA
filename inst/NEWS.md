@@ -1,6 +1,30 @@
 __Infinite Mixtures of Infinite Factor Analysers__
 ==================================================  
 
+## IMIFA v2.2.0 - (_18<sup>th</sup> release [minor update]: 2023-12-12_)
+### New Features
+* `get_IMIFA_results` gains the arg. `adapt`, allowing automatic, post-hoc truncation of  
+redundant factors in cases where `mcmc_IMIFA` was called with `adapt=FALSE` only  
+(provided relevant parameters were stored) for the `"IFA"`, `"MIFA"`, `"OMIFA"`, & `"IMIFA"` methods.
+* `mgpControl` gains the `active.crit` arg. to allow the criterion for determining the number of  
+active factors of Schiavon & Canale (2020) to be used (for `"IFA"` models only); this is available  
+for both `mcmc_IMIFA` with `adapt=TRUE` directly and the aforementioned post-hoc adaptation using  
+`get_IMIFA_results`, though the old criterion of Bhattacharya & Dunson (2011), `active.crit="BD"`,  
+remains the default for all infinite factor models in each case. See documentation for details. 
+
+### Improvements, Bug Fixes, & Miscellaneous Edits
+* Models with `range.Q=0` now work again for the `"FA"`, `"MFA"`, `"OMFA"`, & `"IMFA"` methods.  
+_(with thanks to @abcoxyzide for flagging the issue)_
+* The `mgpControl` arg. `delta0g` now also governs `beta.d1`, `beta.d2`,  
+  & `sigma.hyper`, in addition to `alpha.d1` & `alpha.d2`.
+* Improved documentation & checks related to the `Ledermann` bound + added various references to,  
+  & warnings for, the stricter `Q <= floor((P - 1)/2)` restriction throughout the package.
+* Minor fixes for `"MFA"`/`"MIFA"` models when `mu0g`, `psi0g`, &/or `delta0g`  
+  is `TRUE`, particularly when `length(range.G) > 1`.
+* Minor speed-up to `G_priorDensity` when `discount` is non-zero.
+* Extensive edits to avoid overheads introduced in `matrixStats (>= 1.0.0)` + related minor speed-ups.
+* Now using newer `CITATION` commands & updated `License: GPL (>= 3)`. 
+
 ## IMIFA v2.1.10 - (_17<sup>th</sup> release [patch update]: 2022-12-19_)
 ### Improvements, Bug Fixes, & Miscellaneous Edits
 * Minor fix to adaptive Gibbs sampler for clusters with zero factors.
@@ -302,7 +326,7 @@ __Infinite Mixtures of Infinite Factor Analysers__
 * Transparency default in `plot.Results_IMIFA` now depends on device's support of semi-transparency.
 * Replaced certain instances of `is.list(x)` with `inherits(x, "list")` for stricter checking.
 * Added `check.margin=FALSE` to calls to `sweep`.
-* `Ledermann`, `MGP_check`, and `PGMM_dfree` are now properly vectorised.
+* `Ledermann`, `MGP_check`, & `PGMM_dfree` are now properly vectorised.
 
 ### Miscellaneous Edits
 * Added `USPSdigits` data set (training and test),  

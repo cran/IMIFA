@@ -3,12 +3,12 @@
 #' A package for Bayesian nonparametric clustering of high-dimensional data sets, providing functions for fitting, diagnostic tools and plotting for Infinite Mixtures of Infinite Factor Analysers and the full suite of related models introduced by Murphy et al. (2020) <\doi{10.1214/19-BA1179}>. Allows model based clustering with factor analytic covariance structures without recourse to model selection criteria to choose the number of clusters or cluster-specific latent factors. Model-specific diagnostic tools are also provided, as well as many options for plotting results, conducting posterior inference on parameters of interest, posterior predictive checking, and quantifying uncertainty.
 #'
 #' @section Details:
-#' \itemize{
+#' \describe{
 #' \item{Type: }{Package}
 #' \item{Package: }{IMIFA}
-#' \item{Version: }{2.1.10}
-#' \item{Date: }{2022-12-19 (this version), 2017-02-02 (original release)}
-#' \item{Licence: }{GPL (>=2)}
+#' \item{Version: }{2.2.0}
+#' \item{Date: }{2023-12-12 (this version), 2017-02-02 (original release)}
+#' \item{Licence: }{GPL (>= 3)}
 #' }
 #'
 #' @section Usage:
@@ -30,7 +30,7 @@
 #'
 #' \strong{Maintainer}: Keefe Murphy - <\email{keefe.murphy@@mu.ie}>
 #' @section References:
-#' Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
+#' Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\doi{10.1214/19-BA1179}>.
 #'
 #' @section See Also:
 #' Further details and examples are given in the associated vignette document:\cr
@@ -44,7 +44,7 @@
   version <- read.dcf(path, "Version")
   name    <- read.dcf(path, "Package")
   if(interactive()) {
-    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\\t   Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\\t     and Related Models\n/____/_/   /_/_____/_/  /_/     \\_\\\t\t version", version, "\n"))
+    packageStartupMessage(paste("\n   ________  __________________\n  /_  __/  |/   /_  __/ ___/ _ \\\t   Infinite Mixtures of\n   / / / /|_// / / / / /__/ /_\\ \\     Infinite Factor Analysers\n _/ /_/ /   / /_/ /_/ ___/ /___\\ \\\t     and Related Models\n/____/_/   /_/_____/_/  /_/     \\_\\\t\t  version", version, "\n"))
   } else   {
     packageStartupMessage("\nPackage ", sQuote(name), " version ", version, ".\n")
   }

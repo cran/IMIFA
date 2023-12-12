@@ -5,7 +5,7 @@
 # Gibbs Sampler Function
   .gibbs_OMFA      <- function(Q, data, iters, N, P, G, mu.zero, sigma.mu, mu, sigma.l, burnin,
                                thinning, uni.type, uni.prior, sw, psi.alpha, psi.beta, verbose,
-                               cluster, learn.alpha, a.hyper, zeta, tune.zeta, ...) {
+                               cluster, learn.alpha, a.hyper, zeta, tune.zeta, col.mean, ...) {
 
   # Define & initialise variables
     start.time     <- proc.time()
@@ -79,14 +79,19 @@
     psi.beta       <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
     pi.prop        <- c(cluster$pi.prop, numeric(G - length(cluster$pi.prop)))
     mu             <- cbind(mu, vapply(seq_len(G - length(cluster$pi.prop)), function(g) .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P)))
-    eta            <- .sim_eta_p(N=N, Q=Q)
-    lmat           <- if(Q0) array(vapply(Gseq, function(g) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, G)) else array(0, dim=c(P, 0, G))
+    if(Q0)              {
+      eta          <- .sim_eta_p(N=N, Q=Q)
+      lmat         <- array(vapply(Gseq, function(g) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, G))
+    } else              {
+      eta          <- .empty_mat(nr=N)
+      lmat         <- array(0L, dim=c(P, 0, G))
+    }
     if(isTRUE(one.uni)) {
       psi.inv      <- matrix(.sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), nrow=P, ncol=G)
     } else psi.inv <- replicate(G, .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), simplify="array")
     psi.inv        <- if(uni) t(psi.inv) else psi.inv
     if(isTRUE(one.uni))     {
-      psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
+      psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data, center=col.mean, refine=FALSE, useNames=FALSE), max(colVars(data, center=col.mean, refine=FALSE, useNames=FALSE)))
     } else  {
       tmp.psi      <- (nn[nn0] - 1L)/pmax(rowsum(data^2, z) - rowsum(data, z)^2/nn[nn0], 0L)
       tmp.psi      <- switch(EXPR=uni.type, unconstrained=t(tmp.psi), matrix(Rfast::rowMaxs(tmp.psi, value=TRUE), nrow=P, ncol=G, byrow=TRUE))
@@ -139,9 +144,9 @@
       }
 
     # Means
-      sum.data     <- vapply(dat.g, colSums2, numeric(P))
+      sum.data     <- vapply(dat.g, colSums2, useNames=FALSE, numeric(P))
       sum.data     <- if(uni) t(sum.data) else sum.data
-      sum.eta      <- lapply(eta.tmp, colSums2)
+      sum.eta      <- lapply(eta.tmp, colSums2, useNames=FALSE)
       mu[,]        <- vapply(Gseq, function(g) if(nn0[g]) .sim_mu(mu.sigma=mu.sigma, psi.inv=psi.inv[,g], mu.prior=mu.prior, sum.data=sum.data[,g], sum.eta=sum.eta[[g]],
                              lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero), numeric(P))
 
@@ -177,7 +182,7 @@
       nn.ind       <- which(nn0)
       G.non        <- length(nn.ind)
 
-      if(zerr && !err.z) {                                     cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE)
+      if(zerr && !err.z) {                                     cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE, immediate.=TRUE)
         err.z      <- TRUE
       }
       if(storage)  {
@@ -190,7 +195,7 @@
         if(sw["pi.sw"])                 pi.store[,new.it]   <- pi.prop
         if(learn.alpha)               alpha.store[new.it]   <- pi.alpha
                                          z.store[new.it,]   <- as.integer(z)
-                                         ll.store[new.it]   <- sum(rowLogSumExps(log.probs))
+                                         ll.store[new.it]   <- sum(rowLogSumExps(log.probs, useNames=FALSE))
                                           G.store[new.it]   <- as.integer(G.non)
       }
     }

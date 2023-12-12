@@ -5,7 +5,7 @@
 # Gibbs Sampler Function
   .gibbs_FA      <- function(Q, data, iters, N, P, sigma.mu, mu, burnin,
                              thinning, uni.type, uni.prior, psi.alpha, psi.beta,
-                             sw, mu.zero, verbose, sigma.l, scaling, ...) {
+                             sw, mu.zero, verbose, sigma.l, scaling, col.mean, ...) {
                             #sw, mu.zero, verbose, sigma.l, scaling, hetero, eta.shape, eta.rate, ...) {
 
   # Define & initialise variables
@@ -53,14 +53,19 @@
     psi.beta     <- switch(EXPR=uni.prior, isotropic=psi.beta[which.max(.ndeci(psi.beta))], psi.beta)
     uni.shape    <- switch(EXPR=uni.type,  constrained=N/2 + psi.alpha,  single=(N * P)/2 + psi.alpha)
     V            <- switch(EXPR=uni.type,  constrained=P,                single=1L)
-   #if(hetero)       {
-   #  eta.sig    <- .rgamma0(Q, shape=eta.shape, rate=eta.rate)
-   #  eta        <- .sim_het_p(N=N, Q=Q, eta.sig=eta.sig)
-   #} else eta   <- .sim_eta_p(N=N, Q=Q)
-    eta          <- .sim_eta_p(N=N, Q=Q)
-    lmat         <- matrix(.sim_load_p(Q=Q, P=P, sig.l.sqrt=sqrt(sigma.l)), nrow=P, ncol=Q)
+    if(Q0)           {
+     #if(hetero)     {
+     #  eta.sig  <- .rgamma0(Q, shape=eta.shape, rate=eta.rate)
+     #  eta      <- .sim_het_p(N=N, Q=Q, eta.sig=eta.sig)
+     #} else eta <- .sim_eta_p(N=N, Q=Q)
+      eta        <- .sim_eta_p(N=N, Q=Q)
+      lmat       <- matrix(.sim_load_p(Q=Q, P=P, sig.l.sqrt=sqrt(sigma.l)), nrow=P, ncol=Q)
+    } else           {
+      eta        <- .empty_mat(nr=N)
+      lmat       <- .empty_mat(nr=P)
+    }
     psi.inv      <- .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta)
-    psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
+    psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data, center=col.mean, refine=FALSE, useNames=FALSE), max(colVars(data, center=col.mean, refine=FALSE, useNames=FALSE)))
     max.p        <- (psi.alpha  - 1)/psi.beta
     inf.ind      <- psi.inv > max(max.p)
     psi.inv[inf.ind]       <- switch(EXPR=uni.type, constrained=max.p, rep(max.p, P))[inf.ind]
@@ -92,7 +97,7 @@
 
     # Means
       if(update.mu) {
-        mu[]     <- .sim_mu(N=N, P=P, mu.sigma=mu.sigma, psi.inv=psi.inv, sum.data=sum.data, sum.eta=colSums2(eta), lmat=lmat, mu.prior=mu.prior)
+        mu[]     <- .sim_mu(N=N, P=P, mu.sigma=mu.sigma, psi.inv=psi.inv, sum.data=sum.data, sum.eta=colSums2(eta, useNames=FALSE), lmat=lmat, mu.prior=mu.prior)
       }
 
       if(storage) {

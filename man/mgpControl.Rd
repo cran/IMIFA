@@ -8,7 +8,8 @@ mgpControl(alpha.d1 = 2.1,
            alpha.d2 = 3.1,
            phi.hyper = c(3, 2),
            sigma.hyper = c(3, 2),
-           prop = 0.7,
+           active.crit = c("BD", "SC"),
+           prop = switch(active.crit, BD=0.7, SC=0.99),
            eps = 0.1,
            adapt = TRUE,
            forceQg = FALSE,
@@ -24,23 +25,29 @@ mgpControl(alpha.d1 = 2.1,
            ...)
 }
 \arguments{
-\item{alpha.d1}{Shape hyperparameter of the column shrinkage on the first column of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{2.1}.}
+\item{alpha.d1}{Shape hyperparameter of the column shrinkage on the first column of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{2.1}. For \code{"MIFA"} models, see \code{delta0g}.}
 
-\item{alpha.d2}{Shape hyperparameter of the column shrinkage on the subsequent columns of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{3.1}.}
+\item{alpha.d2}{Shape hyperparameter of the column shrinkage on the subsequent columns of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{3.1}. For \code{"MIFA"} models, see \code{delta0g}.}
 
 \item{phi.hyper}{A vector of length 2 giving the shape and rate hyperparameters for the gamma prior on the local shrinkage parameters. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{c(3, 2)}. It is suggested that the rate be <= shape minus 1 to induce local shrinkage, though the cumulative shrinkage property is unaffected by these hyperparameters. Excessively small values may lead to critical numerical issues and should thus be avoided; indeed it is \emph{suggested} that the shape be >=1.}
 
-\item{sigma.hyper}{A vector of length 2 giving the shape and rate hyperparameters for the gamma prior on the cluster shrinkage parameters. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{c(3, 2)}. Again, it is \emph{suggested} that the shape be >= 1. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods when \code{isTRUE(cluster.shrink)}.}
+\item{sigma.hyper}{A vector of length 2 giving the shape and rate hyperparameters for the gamma prior on the cluster shrinkage parameters. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{c(3, 2)}. Again, it is \emph{suggested} that the shape be >= 1. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods when \code{isTRUE(cluster.shrink)}. Additionally, for the \code{"MIFA"} method when \code{delta0g=TRUE}, \code{sigma.hyper} can be supplied as a matrix with two rows and appropriate dimension or as a list of length \code{length(range.G)} of vectors of length 2 or matrices with two rows and appropriate dimensions.}
 
-\item{prop}{Proportion of loadings elements within the neighbourhood \code{eps} of zero necessary to consider a loadings column redundant. Defaults to \code{floor(0.7 * P)/P}, where \code{P} is the number of variables in the data set. However, if the data set is univariate or bivariate, the default is \code{0.5} (see Note).}
+\item{active.crit}{A character string indicating which criterion to use to determine the number of active factors during adaptive Gibbs sampling (i.e. only relevant when \code{adapt=TRUE}). This is \code{"BD"} by default, for the truncation criterion of Bhattacharya and Dunson (2011). The option \code{"SC"} is provided for the criterion of Schiavon and Canale (2020) but is currently \strong{only} available when \code{method="IFA"} and is liable to be slightly slower (though more accurate).}
 
-\item{eps}{Neighbourhood epsilon of zero within which a loadings entry is considered negligible according to \code{prop}. Defaults to \code{0.1}. Must be positive.}
+\item{prop}{Only relevant when \code{adapt=TRUE} and both the meaning and default behaviour change according to the value of \code{active.crit}:
+\describe{
+\item{\code{active.crit="BD"}}{Proportion of loadings elements within the neighbourhood \code{eps} of zero necessary to consider a loadings column redundant. Defaults to \code{floor(0.7 * P)/P}, where \code{P} is the number of variables in the data set. However, if the data set is univariate or bivariate, the default is \code{0.5} (see Note).}
+\item{\code{active.crit="SC"}}{Minimum proportion of variance which must be explained after truncating a loadings column. The smallest number of factors for which the proportion of variance explained exceeds \code{prop} are retained at each iteration. Defaults to \code{0.99}, unless the data set is univariate or bivariate, in which case the default is \code{0.5} (see Note).}
+}}
 
-\item{adapt}{A logical value indicating whether adaptation of the number of cluster-specific factors is to take place when the MGP prior is employed. Defaults to \code{TRUE}. Specifying \code{FALSE} and supplying \code{range.Q} within \code{\link{mcmc_IMIFA}} provides a means to either approximate the infinite factor model with a fixed high truncation level, or to use the MGP prior in a finite factor context, however this is NOT recommended for the \code{"OMIFA"} and \code{"IMIFA"} methods.}
+\item{eps}{Only relevant when \code{adapt=TRUE} and \code{active.crit="BD"}. Neighbourhood epsilon of zero within which a loadings entry is considered negligible according to \code{prop}. Defaults to \code{0.1}. Must be positive.}
 
-\item{forceQg}{A logical indicating whether the upper limit on the number of cluster-specific factors \code{Q} is also cluster-specific. Defaults to \code{FALSE}: when \code{TRUE}, the number of factors in each cluster is kept below the number of observations in each cluster, in addition to the bound defined by \code{range.Q}. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods, and only invoked when \code{adapt} is \code{TRUE}. May be useful for low-dimensional data sets for which identifiable solutions are desired.}
+\item{adapt}{A logical value indicating whether adaptation of the number of cluster-specific factors is to take place when the MGP prior is employed. Defaults to \code{TRUE}. Specifying \code{FALSE} and supplying \code{range.Q} within \code{\link{mcmc_IMIFA}} provides a means to either approximate the infinite factor model with a fixed, high truncation level, or to use the MGP prior in a finite-factor context, however this is NOT recommended for the \code{"OMIFA"} and \code{"IMIFA"} methods. Note that users who specify \code{adapt=FALSE} here can later recover the (cluster-specific) numbers of non-redundant factors by supplying \code{adapt=TRUE} to \code{\link{get_IMIFA_results}} provided the relevant parameters are stored via \code{\link{storeControl}} (\code{load.switch} for \code{active.crit="BD"}; \code{load.switch} and \code{score.switch} for \code{active.crit="SC"}), though this is not required. Generally, invoking \code{adapt} \emph{during sampling} will reduce the computational burden significantly.}
 
-\item{cluster.shrink}{A logical value indicating whether to place the prior specified by \code{sigma.hyper} on the cluster shrinkage parameters. Defaults to \code{TRUE}. Specifying \code{FALSE} is equivalent to fixing all cluster shrinkage parameters to 1. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods. If invoked, the posterior mean cluster shrinkage factors will be reported.}
+\item{forceQg}{A logical indicating whether the upper limit on the number of cluster-specific factors \code{Q} is also cluster-specific. This upper limit is determined the number of observations in the given cluster. Defaults to \code{FALSE}: when \code{TRUE}, the number of factors in each cluster is kept below the number of observations in each cluster, in addition to the bound defined by \code{range.Q}. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods, and only invoked when \code{adapt} is \code{TRUE}. May be useful for low-dimensional data sets for which identifiable solutions are desired. It is also advisable that the number of latent factors not exceed the associated \code{\link{Ledermann}} bound, or the stricter bound \code{floor((P - 1)/2)}, but these restrictions are not enforced by \code{forceQg}.}
+
+\item{cluster.shrink}{A logical value indicating whether to place the prior specified by \code{sigma.hyper} on the cluster shrinkage parameters. Defaults to \code{TRUE}. Specifying \code{FALSE} is equivalent to fixing all cluster shrinkage parameters to \code{1}. Only relevant for the \code{"IMIFA"}, \code{"OMIFA"}, and \code{"MIFA"} methods. If invoked, the posterior mean cluster shrinkage factors will be reported.}
 
 \item{truncated}{A logical value indicating whether the version of the MGP prior based on left-truncated gamma distributions is invoked (see Zhang et al. reference below and additional relevant documentation in \code{\link{ltrgamma}} and \code{\link{MGP_check}}). Defaults to \code{FALSE}. Note that, when \code{TRUE}, the expected shrinkage factors for the first loadings column are not affected and the conditions needed to pass \code{\link{MGP_check}} for the parameters associated with subsequent columns are much less strict. Moreover, more desirable shrinkage properties are easily obtained, at the expense of slightly longer run times.}
 
@@ -50,15 +57,15 @@ mgpControl(alpha.d1 = 2.1,
 
 Defaults to \code{0.1} & \code{0.00005}, respectively. Must be non-negative and strictly positive, respectively, to ensure diminishing adaptation.}
 
-\item{beta.d1}{Rate hyperparameter of the column shrinkage on the first column of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to 1.}
+\item{beta.d1}{Rate hyperparameter of the column shrinkage on the first column of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{1}. For \code{"MIFA"} models, see \code{delta0g}.}
 
-\item{beta.d2}{Rate hyperparameter of the column shrinkage on the subsequent columns of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to 1.}
+\item{beta.d2}{Rate hyperparameter of the column shrinkage on the subsequent columns of the loadings according to the MGP shrinkage prior. Passed to \code{\link{MGP_check}} to ensure validity. Defaults to \code{1}. For \code{"MIFA"} models, see \code{delta0g}.}
 
 \item{start.AGS}{The iteration at which adaptation under the AGS is to begin. Defaults to \code{burnin} for the \code{"IFA"} and \code{"MIFA"} methods, defaults to \code{2} for the \code{"OMIFA"} and \code{"IMIFA"} methods, and defaults to \code{2} for all methods if the data set is univariate or bivariate. Cannot exceed \code{burnin}; thus defaults to the same value as \code{burnin} if necessary.}
 
 \item{stop.AGS}{The iteration at which adaptation under the AGS is to stop completely. Defaults to \code{Inf}, such that the AGS is never explicitly forced to stop (thereby overriding the diminishing adaptation probability after \code{stop.AGS}). Must be greater than \code{start.AGS}. The diminishing adaptation probability prior to \code{stop.AGS} is still governed by the arguments \code{b0} and \code{b1}.}
 
-\item{delta0g}{Logical indicating whether the \code{alpha.d1} and \code{alpha.d2} hyperparameters can be cluster-specific. Defaults to \code{FALSE}. Only relevant for the \code{"MIFA"} method and only allowed when \code{z.list} is supplied within \code{\link{mcmc_IMIFA}}.}
+\item{delta0g}{Logical indicating whether the \code{alpha.d1}, \code{alpha.d2}, \code{beta.d1}, \code{beta.d2}, and \code{sigma.hyper} hyperparameters can be cluster-specific (i.e., matrices of appropriate dimension for \code{sigma.hyper}, vectors of appropriate length for the other hyperparameters, or a list of length \code{length(range.G)} of such items). Defaults to \code{FALSE}. Only relevant for the \code{"MIFA"} method and only allowed when \code{z.list} is supplied within \code{\link{mcmc_IMIFA}}. See \strong{Examples} below.}
 
 \item{...}{Catches unused arguments.}
 }
@@ -82,18 +89,25 @@ mgpctrl <- mgpControl(phi.hyper=c(2.5, 1), eps=1e-02, truncated=TRUE)
 # Alternatively specify these arguments directly
 # sim   <- mcmc_IMIFA(olive, "IMIFA", n.iters=5000,
 #                     phi.hyper=c(2.5, 1), eps=1e-02, truncated=TRUE)
+
+# Use delta0g for a MIFA model with supplied cluster labels
+# sim2  <- mcmc_IMIFA(olive, n.iters=5000, method="MIFA", range.G=3,
+#                     z.list=olive$area, delta0g=TRUE, alpha.d1=4:2, alpha.d2=5:3
+#                     sigma.hyper=matrix(c(4:6, rep(2, 3)), nrow=2, byrow=TRUE))
 }
 \references{
-Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\href{https://projecteuclid.org/euclid.ba/1570586978}{doi:10.1214/19-BA1179}>.
+Murphy, K., Viroli, C., and Gormley, I. C. (2020) Infinite mixtures of infinite factor analysers, \emph{Bayesian Analysis}, 15(3): 937-963. <\doi{10.1214/19-BA1179}>.
 
 Durante, D. (2017). A note on the multiplicative gamma process, \emph{Statistics & Probability Letters}, 122: 198-204.
 
 Bhattacharya, A. and Dunson, D. B. (2011) Sparse Bayesian infinite factor models, \emph{Biometrika}, 98(2): 291-306.
 
-Zhang, X., Dunson, D. B., and Carin, L. (2011) Tree-structured infinite sparse factor model. In Getoor, L. and Scheffer, T. (Eds.), \emph{Proceedings of the 28th International Conference on Machine Learning}, ICML'11, Madison, WI, USA, pp. 785-792. Omnipress.
+Schiavon, L. and Canale, A. (2020) On the truncation criteria in infinite factor models, \emph{Stat}, 9:e298.
+
+Zhang, X., Dunson, D. B., and Carin, L. (2011) Tree-structured infinite sparse factor model. In Getoor, L. and Scheffer, T. (Eds.), \emph{Proceedings of the 28th International Conference on Machine Learning (ICML 2011)}, June 28-July 2, 2011, Bellevue, WA, USA, pp. 785-792. Madison, WI, USA: Omnipress.
 }
 \seealso{
-\code{\link{mcmc_IMIFA}}, \code{\link{MGP_check}}, \code{\link{ltrgamma}}, \code{\link{mixfaControl}}, \code{\link{bnpControl}}, \code{\link{storeControl}}
+\code{\link{mcmc_IMIFA}}, \code{\link{Ledermann}}, \code{\link{MGP_check}}, \code{\link{ltrgamma}}, \code{\link{mixfaControl}}, \code{\link{bnpControl}}, \code{\link{storeControl}}, \code{\link{get_IMIFA_results}}
 }
 \author{
 Keefe Murphy - <\email{keefe.murphy@mu.ie}>

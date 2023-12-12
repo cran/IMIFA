@@ -4,7 +4,7 @@
 
 # Gibbs Sampler Function
   .gibbs_MFA       <- function(Q, data, iters, N, P, G, mu.zero, sigma.mu, mu,
-                               sigma.l, burnin, thinning, uni.type, uni.prior,
+                               sigma.l, burnin, thinning, uni.type, uni.prior, col.mean,
                                sw, psi.alpha, psi.beta, verbose, cluster, equal.pro, ...) {
 
   # Define & initialise variables
@@ -79,15 +79,20 @@
     mu0g           <- cluster$l.switch[1L]
     psi0g          <- cluster$l.switch[2L]
     label.switch   <- any(cluster$l.switch)
-    eta            <- .sim_eta_p(N=N, Q=Q)
-    lmat           <- if(Q0) array(vapply(Gseq, function(g) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, G)) else array(0, dim=c(P, 0, G))
+    if(Q0)                  {
+      eta          <- .sim_eta_p(N=N, Q=Q)
+      lmat         <- array(vapply(Gseq, function(g) .sim_load_p(Q=Q, P=P, sig.l.sqrt=sig.l.sqrt), numeric(P * Q)), dim=c(P, Q, G))
+    } else                  {
+      eta          <- .empty_mat(nr=N)
+      lmat         <- array(0L, dim=c(P, 0, G))
+    }
     if(isTRUE(one.uni))     {
       psi.beta     <- psi.beta[,1L]
       psi.inv      <- matrix(.sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta), nrow=P, ncol=G)
     } else psi.inv <- vapply(Gseq, function(g) .sim_psi_ip(P=P, psi.alpha=psi.alpha, psi.beta=psi.beta[,g]), numeric(P))
     psi.inv        <- if(uni)     t(psi.inv)    else psi.inv
     if(isTRUE(one.uni))     {
-      psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data), max(colVars(data)))
+      psi.inv[]    <- 1/switch(EXPR=uni.type, constrained=colVars(data, center=col.mean, refine=FALSE, useNames=FALSE), max(colVars(data, center=col.mean, refine=FALSE, useNames=FALSE)))
     } else  {
       tmp.psi      <- (nn[nn0] - 1L)/pmax(rowsum(data^2, z) - rowsum(data, z)^2/nn[nn0], 0L)
       tmp.psi      <- switch(EXPR=uni.type, unconstrained=t(tmp.psi), matrix(Rfast::rowMaxs(tmp.psi, value=TRUE), nrow=P, ncol=G, byrow=TRUE))
@@ -131,9 +136,9 @@
       }
 
     # Means
-      sum.data     <- vapply(dat.g, colSums2, numeric(P))
+      sum.data     <- vapply(dat.g, colSums2, useNames=FALSE, numeric(P))
       sum.data     <- if(uni) t(sum.data) else sum.data
-      sum.eta      <- lapply(eta.tmp, colSums2)
+      sum.eta      <- lapply(eta.tmp, colSums2, useNames=FALSE)
       mu[,]        <- vapply(Gseq, function(g) if(nn0[g]) .sim_mu(mu.prior=mu.prior[,g], mu.sigma=mu.sigma, psi.inv=psi.inv[,g], sum.data=sum.data[,g], sum.eta=sum.eta[[g]],
                              lmat=if(Q1) as.matrix(lmat[,,g]) else lmat[,,g], N=nn[g], P=P) else .sim_mu_p(P=P, sig.mu.sqrt=sig.mu.sqrt, mu.zero=mu.zero[,g]), numeric(P))
 
@@ -150,8 +155,6 @@
         }
       }
       z            <- gumbel_max(probs=log.probs)
-      nn           <- tabulate(z, nbins=G)
-      nn0          <- nn > 0
 
     # Label Switching
       if(label.switch) {
@@ -165,7 +168,6 @@
           lmat[,,left]     <- lmat[,,right,    drop=FALSE]
           psi.inv[,left]   <- psi.inv[,right,  drop=FALSE]
           pi.prop[left]    <- pi.prop[right]
-          nn[left]         <- nn[right]
           if(mu0g)  {
            mu.zero[,left]  <- mu.zero[,right,  drop=FALSE]
            mu.prior[,left] <- mu.prior[,right, drop=FALSE]
@@ -175,8 +177,10 @@
           }
         }
       }
+      nn           <- tabulate(z, nbins=G)
+      nn0          <- nn > 0
 
-      if(zerr && !err.z) {                                    cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE)
+      if(zerr && !err.z) {                                    cat("\n"); warning("\nAlgorithm may slow due to corrections for Choleski decompositions of non-positive-definite covariance matrices\n", call.=FALSE, immediate.=TRUE)
         err.z      <- TRUE
       }
       if(storage)  {
@@ -188,7 +192,7 @@
         if(sw["psi.sw"])             psi.store[,,new.it]   <- 1/psi.inv
         if(sw["pi.sw"])                pi.store[,new.it]   <- pi.prop
                                         z.store[new.it,]   <- as.integer(z)
-                                        ll.store[new.it]   <- sum(rowLogSumExps(log.probs))
+                                        ll.store[new.it]   <- sum(rowLogSumExps(log.probs, useNames=FALSE))
       }
     }
     if(verbose)       close(pb)
